@@ -33,69 +33,94 @@
 ```bash
 git clone https://github.com/Hisha/flux_api.git
 cd flux_api
-2. Configure Environment
-Create a .env file in the project root:
+```
 
-ini
-Copy
-Edit
+### 2. Configure Environment
+
+Create a `.env` file in the project root:
+
+```env
 SECRET_KEY=your-secret-key
 N8N_API_TOKEN=your-api-token
-3. Install Dependencies
+```
+
+### 3. Install Dependencies
+
 Python 3.10+ is recommended.
 
-bash
-Copy
-Edit
+```bash
 pip install -r requirements.txt
-4. Run the Server
-bash
-Copy
-Edit
+```
+
+### 4. Run the Server
+
+```bash
 uvicorn flux_api:app --reload
-Then visit: http://localhost:8000/flux
+```
 
-🔐 Authentication
-The Admin Panel and Job Dashboard require login.
+Then visit: [http://localhost:8000/flux](http://localhost:8000/flux)
 
-API access requires a Bearer token (N8N_API_TOKEN) passed in the Authorization header.
+---
 
-The password is defined inside auth.py.
+## 🔐 Authentication
 
-📁 Folder Structure
-Path	Purpose
-templates/	Jinja2 HTML templates
-~/FluxImages/	All generated images are saved here
-/mnt/ai_data/linkable/	Shared folder for downloadable linkable files
-flux_jobs.db	SQLite database for job queue and history
+- The **Admin Panel** and **Job Dashboard** require login (password defined in `auth.py`)
+- API access requires a Bearer token (`N8N_API_TOKEN`) passed in the `Authorization` header
 
-📡 API Endpoints
-All token-protected endpoints require an Authorization: Bearer <token> header.
+---
 
-POST /flux/generate/json – Submit a new image job (via JSON)
+## 📁 Folder Structure
 
-GET /flux/jobs/json – Get recent jobs as JSON
+| Path                      | Purpose                                          |
+|---------------------------|--------------------------------------------------|
+| `templates/`              | Jinja2 HTML templates                            |
+| `~/FluxImages/`           | All generated images are saved here              |
+| `/mnt/ai_data/linkable/`  | Shared folder for downloadable linkable files    |
+| `flux_jobs.db`            | SQLite database for job queue and history        |
 
-POST /flux/clear_queue – Clear all queued jobs
+---
 
-🖼️ Screenshots
-(Add screenshots here of dashboard, gallery, and admin page once available)
+## 📡 API Endpoints
 
-📌 Future Plans
- Add image tags and search filters
+> All token-protected endpoints require:  
+> `Authorization: Bearer <your-api-token>`
 
- Job retry or edit from UI
+### Submit a new image job (via JSON)
+```http
+POST /flux/generate/json
+```
 
- Dark/light mode toggle
+### Get recent jobs as JSON
+```http
+GET /flux/jobs/json
+```
 
- Gallery upload integration (e.g., Telegram or YouTube Shorts)
+### Clear all queued jobs
+```http
+POST /flux/clear_queue
+```
 
-👤 Maintainer
-Kevin Smith
-GitHub: @Hisha
+---
 
-This project is part of the larger Fantasy Broadcast Network AI content automation system.
+## 📌 Future Plans
 
-🛡️ License
-This project is licensed under the MIT License.
+- Add image tags and search filters  
+- Job retry or edit from UI  
+- Dark/light mode toggle  
+- Gallery upload integration (e.g., Telegram or YouTube Shorts)
+
+---
+
+## 👤 Maintainer
+
+**Kevin Smith**  
+GitHub: [@Hisha](https://github.com/Hisha)
+
+> This project is part of the larger **Fantasy Broadcast Network** AI content automation system.
+
+---
+
+## 🛡️ License
+
+This project is licensed under the **MIT License**.  
 Free to use, modify, and distribute.
