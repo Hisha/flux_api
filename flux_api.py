@@ -1,0 +1,438 @@
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
+import sqlite3
+import multiprocessing
+import random
+from fastapi import FastAPI, HTTPException, Query, Request, Form, status, Header, Depends, APIRouter, Body
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
+from auth import verify_password, require_login, is_authenticated
+from db import add_job, get_job, get_job_by_filename, get_job_metrics, get_recent_jobs, delete_old_jobs, get_completed_jobs_for_archive, delete_job, get_all_jobs, get_oldest_queued_job
+from job_queue import add_job_to_db_and_queue, clear_queue
+from typing import Optional
+from datetime import datetime
+import uuid
+import pytz
+from dateutil import parser
+
+app = FastAPI(root_path="/flux")
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY"))
+OUTPUT_DIR = os.path.expanduser("~/FluxImages")
+templates = Jinja2Templates(directory="templates")
+templates.env.globals["root_path"] = "/flux"
+templates.env.globals['now'] = datetime.now
+API_TOKEN = os.getenv("N8N_API_TOKEN")
+eastern = pytz.timezone("US/Eastern")
+LINKABLE_DIR = "/mnt/ai_data/linkable"
+
+class PromptRequest(BaseModel):
+    prompt: str
+    steps: int = 4
+    guidance_scale: float = 3.5
+    height: int = 1024
+    width: int = 1024
+    autotune: bool = True
+    filename: Optional[str] = None  # Optional custom filename
+    output_dir: Optional[str] = None
+
+def format_local_time(iso_str):
+    try:
+        utc_time = parser.isoparse(iso_str)
+        local_time = utc_time.astimezone(eastern)
+        return local_time.strftime("%Y-%m-%d %I:%M %p %Z")  # e.g., 2025-07-15 02:30 PM EDT
+    except Exception:
+        return iso_str  # fallback
+
+# ✅ Register it as a Jinja2 filter
+templates.env.filters["localtime"] = format_local_time
+
+def require_token(authorization: str = Header(None), request: Request = None):
+    expected_token = os.getenv("N8N_API_TOKEN")
+
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[len("Bearer "):].strip()
+
+    if token != expected_token and not is_authenticated(request):
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+#####################################################################################
+#                                   GET                                             #
+#####################################################################################
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard(request: Request):
+    def sort_key(job):
+        priority = {
+            "in_progress": 0,
+            "failed": 1,
+            "queued": 2,
+            "done": 3
+        }
+        return priority.get(job["status"], 99)  # unknown statuses go last
+
+    # Pull a larger pool, sort by priority, then cut to 50
+    all_jobs = get_recent_jobs(limit=500)  # you can increase if needed
+    jobs = sorted(all_jobs, key=sort_key)[:50]
+
+    metrics = get_job_metrics()
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "jobs": jobs,
+        "metrics": metrics,
+        "auto_refresh": True
+    })
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_panel(request: Request):
+    require_login(request)
+    system = admin_system_info(request)
+    metrics = get_job_metrics()
+    try:
+        linkable_files = [
+            f for f in os.listdir(LINKABLE_DIR)
+            if os.path.isfile(os.path.join(LINKABLE_DIR, f))
+        ]
+    except Exception:
+        linkable_files = []
+
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "system": system,
+        "metrics": metrics,
+        "linkable_files": linkable_files
+    })
+
+@app.get("/admin/metrics")
+def metrics(request: Request):
+    require_login(request)
+    return get_job_metrics()
+
+@app.get("/admin/system")
+def admin_system_info(request: Request):
+    require_login(request)
+    return {
+        "cpu_cores": multiprocessing.cpu_count(),
+        "output_dir": OUTPUT_DIR,
+        "note": "Queue length unavailable in DB-based polling model"
+    }
+
+import random
+from fastapi import Query
+
+@app.get("/gallery", response_class=HTMLResponse)
+def gallery(request: Request, page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100)):
+    image_dir = os.path.expanduser("~/FluxImages")
+    files = [f for f in os.listdir(image_dir) if f.lower().endswith(".png")]
+    random.shuffle(files)
+
+    # Calculate pagination bounds
+    total = len(files)
+    start = (page - 1) * limit
+    end = start + limit
+    page_files = files[start:end]
+
+    images = []
+    for fname in page_files:
+        job = get_job_by_filename(fname)
+        if job:
+            images.append({"filename": fname, "job_id": job["job_id"]})
+
+    return templates.TemplateResponse("gallery.html", {
+        "request": request,
+        "images": images,
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "has_prev": page > 1,
+        "has_next": end < total,
+        "root_path": request.scope.get("root_path", "")
+    })
+
+@app.get("/gallery/{job_id}", response_class=HTMLResponse)
+def view_gallery(request: Request, job_id: str):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return templates.TemplateResponse("gallery_detail.html", {
+        "request": request,
+        "job": job,
+        "auto_refresh": False
+    })
+
+@app.get("/images/{filename}")
+def get_image(filename: str):
+    image_path = os.path.join(OUTPUT_DIR, filename)
+
+    if not os.path.exists(image_path):
+        raise HTTPException(status_code=404, detail="Image not found in FluxImages")
+
+    return FileResponse(image_path, media_type="image/png")
+
+@app.get("/jobs/json")
+def jobs(status: str = Query(None), limit: int = Query(50)):
+    return get_recent_jobs(limit=limit, status=status)
+
+@app.get("/jobs", response_class=HTMLResponse)
+def list_jobs(request: Request, status: str = "all", q: str = ""):
+    require_login(request)
+    jobs = get_all_jobs()
+    if status != "all":
+        jobs = [job for job in jobs if job["status"] == status]
+    if q:
+        q_lower = q.lower()
+        jobs = [job for job in jobs if q_lower in job["prompt"].lower()]
+    return templates.TemplateResponse("jobs.html", {
+        "request": request,
+        "jobs": jobs,
+        "status_filter": status,
+        "search_query": q,
+        "auto_refresh": True
+    })
+
+@app.get("/jobs/{job_id}")
+def job_details(request: Request, job_id: str):
+    require_login(request)
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+@app.get("/job/{job_id}", response_class=HTMLResponse)
+def view_job(request: Request, job_id: str):
+    require_login(request)
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return templates.TemplateResponse("job_detail.html", {
+        "request": request,
+        "job": job,
+        "auto_refresh": False
+    })
+
+@app.get("/linkable", response_class=HTMLResponse)
+def linkable_page(request: Request):
+    
+    try:
+        files = [
+            f for f in os.listdir(LINKABLE_DIR)
+            if os.path.isfile(os.path.join(LINKABLE_DIR, f))
+        ]
+    except Exception:
+        files = []
+    return templates.TemplateResponse("linkable.html", {
+        "request": request,
+        "files": files
+    })
+
+@app.get("/linkable/download/{filename}")
+def download_linkable_file(filename: str):
+    # Sanitize filename and enforce safe path
+    safe_path = os.path.abspath(os.path.join(LINKABLE_DIR, filename))
+    if not safe_path.startswith(os.path.abspath(LINKABLE_DIR)) or not os.path.isfile(safe_path):
+        raise HTTPException(status_code=404, detail="Invalid file")
+    return FileResponse(safe_path, filename=filename, media_type="application/octet-stream")
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/flux/login", status_code=303)
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_page(request: Request):
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+@app.get("/status/{job_id}")
+def status(job_id: str):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms_page(request: Request):
+    return templates.TemplateResponse("terms.html", {"request": request})
+
+#####################################################################################
+#                                   POST                                            #
+#####################################################################################
+
+@app.post("/admin/archive")
+def archive_images(request: Request, days: int = 1):
+    require_login(request)
+    jobs = get_completed_jobs_for_archive(days)
+    archived = []
+    for job in jobs:
+        try:
+            archive_date = job["end_time"].split("T")[0]
+            archive_dir = os.path.join(OUTPUT_DIR, "archive", archive_date)
+            os.makedirs(archive_dir, exist_ok=True)
+            src = os.path.join(OUTPUT_DIR, job["filename"])
+            dst = os.path.join(archive_dir, job["filename"])
+            if os.path.exists(src):
+                os.rename(src, dst)
+                archived.append(dst)
+        except Exception:
+            pass
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+
+@app.post("/admin/archive_done")
+def archive_done(request: Request):
+    require_login(request)
+    conn = sqlite3.connect(os.path.expanduser("~/flux_api/flux_jobs.db"))
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS archived_jobs AS SELECT * FROM jobs WHERE 0''')
+    c.execute("INSERT INTO archived_jobs SELECT * FROM jobs WHERE status = 'done'")
+    c.execute("DELETE FROM jobs WHERE status = 'done'")
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+
+@app.post("/admin/cleanup")
+def cleanup(request: Request, days: int = 7):
+    require_login(request)
+    deleted = delete_old_jobs(days=days)
+    deleted_files = []
+    for job in deleted:
+        filepath = os.path.join(OUTPUT_DIR, job["filename"])
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                deleted_files.append(job["filename"])
+            except Exception:
+                pass
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+
+@app.post("/admin/cleanup_failed")
+def cleanup_failed(request: Request):
+    require_login(request)
+    conn = sqlite3.connect(os.path.expanduser("~/flux_api/flux_jobs.db"))
+    c = conn.cursor()
+    c.execute("SELECT filename FROM jobs WHERE status = 'failed'")
+    for row in c.fetchall():
+        f = os.path.join(OUTPUT_DIR, row[0])
+        if os.path.exists(f):
+            os.remove(f)
+    c.execute("DELETE FROM jobs WHERE status = 'failed'")
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+
+@app.post("/admin/clear_queue")
+def admin_clear_queue(request: Request):
+    require_login(request)
+    clear_queue()
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+
+@app.post("/admin/delete/{job_id}")
+def admin_delete(request: Request, job_id: str):
+    require_login(request)
+    filename = delete_job(job_id)
+    if not filename:
+        raise HTTPException(status_code=404, detail="Job not found")
+    path = os.path.join(OUTPUT_DIR, filename)
+    if os.path.exists(path):
+        os.remove(path)
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+
+@app.post("/clear_queue")
+def clear_queue_api(auth=Depends(require_token)):
+    clear_queue()
+    return {"message": "Queue cleared successfully."}
+
+@app.post("/generate", response_class=HTMLResponse)
+def generate_from_form(
+    request: Request,
+    prompt: str = Form(...),
+    steps: int = Form(4),
+    guidance_scale: float = Form(3.5),
+    height: int = Form(1024),
+    width: int = Form(1024),
+    filename: Optional[str] = Form(None),
+):
+    require_login(request)
+
+    job_info = add_job_to_db_and_queue({
+        "prompt": prompt,
+        "steps": steps,
+        "guidance_scale": guidance_scale,
+        "height": height,
+        "width": width,
+        "filename": filename,
+        "autotune": True  # Force autotune to always be enabled
+    })
+
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/job/{job_info['job_id']}", status_code=303)
+
+@app.post("/generate/json")
+def generate_from_json(payload: PromptRequest, request: Request, auth=Depends(require_token)):
+    # Clip token limit enforcement (basic whitespace-based tokenizer)
+    max_tokens = 77
+    original_prompt = payload.prompt.strip()
+    tokens = original_prompt.split()
+
+    if len(tokens) > max_tokens:
+        truncated_prompt = ' '.join(tokens[:max_tokens])
+        payload.prompt = truncated_prompt
+        print(f"[CLIP LIMIT] Truncated prompt from {len(tokens)} to {max_tokens} tokens for job submission.")
+    else:
+        payload.prompt = original_prompt
+
+    job_info = add_job_to_db_and_queue(payload.dict())
+    return {
+        "message": "Job submitted successfully",
+        "job_id": job_info["job_id"],
+        "filename": job_info["filename"]
+    }
+
+@app.post("/jobs/{job_id}/retry")
+def retry_job(request: Request, job_id: str):
+    require_login(request)
+    original = get_job_for_retry(job_id)
+    if not original:
+        raise HTTPException(status_code=400, detail="Job not found or not failed")
+
+    new_id = uuid.uuid4().hex[:8]
+    new_filename = f"{new_id}.png"
+
+    add_job(
+        job_id=new_id,
+        prompt=original["prompt"],
+        steps=original["steps"],
+        guidance_scale=original["guidance_scale"],
+        height=original["height"],
+        width=original["width"],
+        autotune=bool(original["autotune"]),
+        filename=new_filename,
+        output_dir=original.get("output_dir", os.path.expanduser("~/FluxImages"))
+    )
+
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+
+@app.post("/linkable/delete/{filename}")
+def delete_linkable_file(request: Request, filename: str):
+    require_login(request)
+    safe_path = os.path.abspath(os.path.join(LINKABLE_DIR, filename))
+    if not safe_path.startswith(os.path.abspath(LINKABLE_DIR)) or not os.path.isfile(safe_path):
+        raise HTTPException(status_code=404, detail="Invalid file path")
+    try:
+        os.remove(safe_path)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to delete file")
+    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+
+@app.post("/login", response_class=HTMLResponse)
+def login_submit(request: Request, password: str = Form(...)):
+    if verify_password(password):
+        request.session["logged_in"] = True
+        return RedirectResponse(url="/flux", status_code=303)
+    return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid password"})

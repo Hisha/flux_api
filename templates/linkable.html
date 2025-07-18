@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h1 class="text-3xl font-bold mb-6">📁 Linkable Downloads</h1>
+
+  {% if files|length == 0 %}
+    <p class="text-gray-400">No downloadable files found.</p>
+  {% else %}
+    <ul class="space-y-3">
+      {% for file in files %}
+        <li class="bg-gray-800 p-4 rounded shadow hover:bg-gray-700 flex justify-between items-center">
+          <span>{{ file }}</span>
+          <a href="{{ request.scope.root_path }}/linkable/download/{{ file }}" class="text-blue-400 hover:underline text-sm">Download</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}

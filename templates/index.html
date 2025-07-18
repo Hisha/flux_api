@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+  <h1 class="text-3xl font-bold mb-6">⚡ FBN Upload Dashboard</h1>
+
+  <div class="bg-gray-800 p-6 rounded shadow mb-8">
+    <h2 class="text-2xl font-semibold mb-4">📊 System Metrics</h2>
+    <ul class="space-y-2 text-gray-300">
+      <li><strong>Total Jobs:</strong> {{ metrics.total_jobs }}</li>
+      <li><strong>Completed:</strong> {{ metrics.completed_jobs }}</li>
+      <li><strong>Failed:</strong> {{ metrics.failed_jobs }}</li>
+      <li><strong>Avg Duration:</strong> {{ metrics.average_duration_seconds }} s</li>
+      <li><strong>Most Recent Job:</strong> {{ metrics.most_recent_job_time }}</li>
+    </ul>
+  </div>
+
+  <h2 class="text-2xl font-semibold mb-4">🖼️ Recent Jobs</h2>
+  <div class="space-y-4">
+    {% for job in jobs %}
+      <a href="{{ request.scope.root_path }}/job/{{ job.job_id }}" class="block bg-gray-800 p-5 rounded shadow hover:bg-gray-700 border-l-4
+        {% if job.status == 'done' %} border-green-500
+        {% elif job.status == 'failed' %} border-red-500
+        {% elif job.status == 'in_progress' or job.status == 'processing' %} border-yellow-500
+        {% else %} border-gray-600 {% endif %}">
+        <div class="flex justify-between">
+          <p class="font-semibold">{{ job.prompt|truncate(60) }}</p>
+          <span class="uppercase text-xs px-2 py-1 rounded
+            {% if job.status == 'done' %} bg-green-600
+            {% elif job.status == 'failed' %} bg-red-600
+            {% elif job.status == 'in_progress' or job.status == 'processing' %} bg-yellow-600
+            {% else %} bg-gray-600 {% endif %}">{{ job.status }}</span>
+        </div>
+        <p class="text-sm text-gray-400 mt-1">Created: {{ job.start_time | localtime }}</p>
+      </a>
+    {% else %}
+      <p>No jobs found.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
