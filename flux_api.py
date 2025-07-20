@@ -51,6 +51,14 @@ def format_local_time(iso_str):
 # ✅ Register it as a Jinja2 filter
 templates.env.filters["localtime"] = format_local_time
 
+def parse_time(ts):
+    if not ts:
+        return datetime.min
+    try:
+        return datetime.fromisoformat(ts)
+    except:
+        return datetime.min
+
 def require_token(authorization: str = Header(None), request: Request = None):
     expected_token = os.getenv("N8N_API_TOKEN")
 
@@ -69,7 +77,10 @@ def sort_job_priority(job):
         "queued": 2,
         "done": 3
     }
-    return priority.get(job["status"], 99), job.get("start_time", "")
+    sort_key = priority.get(job["status"], 99)
+    timestamp = parse_time(job.get("end_time") or job.get("start_time"))
+    # Newest first: use negative timestamp
+    return (sort_key, -timestamp.timestamp())
 
 #####################################################################################
 #                                   GET                                             #
@@ -185,26 +196,28 @@ def get_image(filename: str):
     return FileResponse(image_path, media_type="image/png")
 
 @app.get("/jobs/json")
-def jobs(status: str = Query(None), limit: int = Query(50)):
+def jobs_json(status: str = Query(None), limit: int = Query(50)):
     jobs = get_recent_jobs(limit=limit, status=status)
     jobs = sorted(jobs, key=sort_job_priority)
     return jobs
     
 @app.get("/jobs", response_class=HTMLResponse)
-def list_jobs(request: Request, status: str = "all", q: str = ""):
-    require_login(request)
-    jobs = get_all_jobs()
-    if status != "all":
-        jobs = [job for job in jobs if job["status"] == status]
+async def job_dashboard(
+    request: Request,
+    status: str = Query("all"),
+    q: str = Query(""),
+    db: sqlite3.Connection = Depends(get_db)
+):
+    jobs = get_recent_jobs(status=status)
     if q:
-        q_lower = q.lower()
-        jobs = [job for job in jobs if q_lower in job["prompt"].lower()]
+        jobs = [j for j in jobs if q.lower() in j["prompt"].lower()]
+    jobs = sorted(jobs, key=sort_job_priority)
+
     return templates.TemplateResponse("jobs.html", {
         "request": request,
         "jobs": jobs,
         "status_filter": status,
-        "search_query": q,
-        "auto_refresh": True
+        "search_query": q
     })
 
 @app.get("/jobs/{job_id}")
