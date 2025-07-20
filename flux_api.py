@@ -19,6 +19,10 @@ from datetime import datetime
 import uuid
 import pytz
 from dateutil import parser
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(root_path="/flux")
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY"))
@@ -78,11 +82,9 @@ def sort_job_priority(job):
         "done": 3
     }
     sort_key = priority.get(job["status"], 99)
-    timestamp = parse_time(job.get("end_time") or job.get("start_time"))
-    
-    # DEBUG:
-    print(f"[SORT] job_id={job.get('job_id')} status={job.get('status')} time={timestamp.isoformat()} -> sort=({sort_key}, {-timestamp.timestamp()})")
-
+    ts_raw = job.get("end_time") or job.get("start_time")
+    timestamp = parse_time(ts_raw)
+    logger.info(f"[SORT] {job.get('job_id')} | {job.get('status')} | {ts_raw} → sort=({sort_key}, {-timestamp.timestamp()})")
     return (sort_key, -timestamp.timestamp())
 
 #####################################################################################
