@@ -39,38 +39,54 @@
   }
 
   function updateJobsTable(jobs) {
-    const container = document.getElementById("job-container");
-    if (!container) return;
+  const container = document.getElementById("job-container");
+  if (!container) return;
 
-    container.innerHTML = ""; // Clear existing content
+  container.innerHTML = ""; // Clear existing content
 
-    jobs.forEach(job => {
-      const div = document.createElement("div");
-      div.className = "p-3 mb-2 rounded bg-gray-800";
+  // Sort jobs based on priority order
+  const priority = {
+    "in_progress": 0,
+    "processing": 0,
+    "failed": 1,
+    "queued": 2,
+    "done": 3
+  };
 
-      let statusColor = "bg-gray-700";
-      if (job.status === "done") statusColor = "bg-green-700";
-      else if (job.status === "failed") statusColor = "bg-red-700";
-      else if (job.status === "queued") statusColor = "bg-yellow-700";
-      else if (job.status === "processing" || job.status === "in_progress") statusColor = "bg-blue-700";
+  jobs.sort((a, b) => {
+    const aPriority = priority[a.status] ?? 99;
+    const bPriority = priority[b.status] ?? 99;
+    return aPriority - bPriority;
+  });
 
-      div.innerHTML = `
-        <div class="flex justify-between items-center mb-1">
-          <div class="font-bold">
-            <a href="{{ root_path }}/job/${job.job_id}" class="text-white">
-              ${job.prompt}
-            </a>
-          </div>
-          <span class="text-xs px-2 py-1 rounded ${statusColor} text-white">
-            ${job.status}
-          </span>
+  jobs.forEach(job => {
+    const div = document.createElement("div");
+    div.className = "p-3 mb-2 rounded bg-gray-800";
+
+    let statusColor = "bg-gray-700";
+    if (job.status === "done") statusColor = "bg-green-700";
+    else if (job.status === "failed") statusColor = "bg-red-700";
+    else if (job.status === "queued") statusColor = "bg-yellow-700";
+    else if (job.status === "processing" || job.status === "in_progress") statusColor = "bg-blue-700";
+
+    div.innerHTML = `
+      <div class="flex justify-between items-center mb-1">
+        <div class="font-bold">
+          <a href="{{ root_path }}/job/${job.job_id}" class="text-white">
+            ${job.prompt}
+          </a>
         </div>
-        <div class="text-sm text-gray-400">Updated: ${job.end_time || job.start_time || "—"}</div>
-      `;
+        <span class="text-xs px-2 py-1 rounded ${statusColor} text-white">
+          ${job.status}
+        </span>
+      </div>
+      <div class="text-sm text-gray-400">Updated: ${job.end_time || job.start_time || "—"}</div>
+    `;
 
-      container.appendChild(div);
-    });
-  }
+    container.appendChild(div);
+  });
+}
+
 
   // Initial fetch and polling
   fetchJobs();
