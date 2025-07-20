@@ -229,25 +229,30 @@ def get_recent_jobs(limit=50, status=None):
         "done": 3
     }
 
-    if status:
-        c.execute("SELECT * FROM jobs WHERE status = ?", (status,))
-    else:
-        c.execute("SELECT * FROM jobs")
+    query = "SELECT * FROM jobs"
+    values = []
 
+    if status and status != "all":
+        query += " WHERE status = ?"
+        values.append(status)
+
+    c.execute(query, values)
     rows = c.fetchall()
     conn.close()
 
-    def sort_key(job):
-        status_rank = status_priority.get(job["status"], 99)
-        ts_str = job["end_time"] or job["start_time"] or ""
+    def safe_time(job):
+        ts = job["end_time"] or job["start_time"]
         try:
-            ts = datetime.fromisoformat(ts_str)
-        except Exception:
-            ts = datetime.min
-        return (status_rank, -ts.timestamp())
+            return datetime.fromisoformat(ts)
+        except:
+            return datetime.min  # oldest if time is invalid/missing
 
-    sorted_rows = sorted([dict(r) for r in rows], key=sort_key)
-    return sorted_rows[:limit]
+    def sort_key(job):
+        prio = status_priority.get(job["status"], 99)
+        ts = safe_time(job)
+        return (prio, -ts.timestamp())
+
+    return sorted([dict(r) for r in rows], key=sort_key)[:limit]
 
 def update_job_status(job_id, status, start_time=None, end_time=None, error_message=None):
     conn = sqlite3.connect(DB_PATH)
