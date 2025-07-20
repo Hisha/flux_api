@@ -247,6 +247,10 @@ def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/flux/login", status_code=303)
 
+@app.get("/metrics/json")
+def metrics_json():
+    return get_job_metrics()
+
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     return templates.TemplateResponse("privacy.html", {"request": request})
