@@ -99,7 +99,7 @@ def dashboard(request: Request):
 
     # Pull a larger pool, sort by priority, then cut to 50
     all_jobs = get_recent_jobs(limit=500)  # you can increase if needed
-    jobs = sorted(all_jobs, key=sort_key)[:50]
+    jobs = sorted(all_jobs, key=sort_job_priority)[:50]
 
     metrics = get_job_metrics()
     return templates.TemplateResponse("index.html", {
@@ -210,7 +210,7 @@ async def job_dashboard(
     jobs = get_recent_jobs(status=status)
     if q:
         jobs = [j for j in jobs if q.lower() in j["prompt"].lower()]
-    jobs = sorted(jobs, key=sort_job_priority, reverse=True)
+    jobs = sorted(jobs, key=sort_job_priority)
 
     return templates.TemplateResponse("jobs.html", {
         "request": request,
