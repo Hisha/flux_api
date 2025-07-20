@@ -28,6 +28,16 @@
 </div>
 
 <script>
+  async function fetchJobs() {
+    try {
+      const response = await fetch('{{ root_path }}/jobs/json');
+      const jobs = await response.json();
+      updateJobsTable(jobs);
+    } catch (err) {
+      console.error("Failed to fetch jobs:", err);
+    }
+  }
+
   function updateJobsTable(jobs) {
     const container = document.getElementById("job-container");
     if (!container) return;
@@ -38,7 +48,6 @@
       const div = document.createElement("div");
       div.className = "p-3 mb-2 rounded bg-gray-800";
 
-      // Choose a background color based on job status
       let statusColor = "bg-gray-700";
       if (job.status === "done") statusColor = "bg-green-700";
       else if (job.status === "failed") statusColor = "bg-red-700";
@@ -62,6 +71,10 @@
       container.appendChild(div);
     });
   }
+
+  // Initial fetch and polling
+  fetchJobs();
+  setInterval(fetchJobs, 30000);
 </script>
 
 {% endblock %}
