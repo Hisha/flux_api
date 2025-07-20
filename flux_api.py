@@ -57,11 +57,11 @@ templates.env.filters["localtime"] = format_local_time
 
 def parse_time(ts):
     if not ts:
-        return datetime.min
+        return datetime.utcnow()  # instead of datetime.min
     try:
         return datetime.fromisoformat(ts)
     except:
-        return datetime.min
+        return datetime.utcnow()  # fallback to now if invalid
 
 def require_token(authorization: str = Header(None), request: Request = None):
     expected_token = os.getenv("N8N_API_TOKEN")
