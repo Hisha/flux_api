@@ -221,18 +221,33 @@ def get_recent_jobs(limit=50, status=None):
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
+    status_priority = {
+        "in_progress": 0,
+        "processing": 0,
+        "failed": 1,
+        "queued": 2,
+        "done": 3
+    }
+
     if status:
-        c.execute('''
-            SELECT * FROM jobs WHERE status = ? ORDER BY start_time DESC LIMIT ?
-        ''', (status, limit))
+        c.execute("SELECT * FROM jobs WHERE status = ?", (status,))
     else:
-        c.execute('''
-            SELECT * FROM jobs ORDER BY start_time DESC LIMIT ?
-        ''', (limit,))
-    
+        c.execute("SELECT * FROM jobs")
+
     rows = c.fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+
+    def sort_key(job):
+        status_rank = status_priority.get(job["status"], 99)
+        ts_str = job["end_time"] or job["start_time"] or ""
+        try:
+            ts = datetime.fromisoformat(ts_str)
+        except Exception:
+            ts = datetime.min
+        return (status_rank, -ts.timestamp())
+
+    sorted_rows = sorted([dict(r) for r in rows], key=sort_key)
+    return sorted_rows[:limit]
 
 def update_job_status(job_id, status, start_time=None, end_time=None, error_message=None):
     conn = sqlite3.connect(DB_PATH)
