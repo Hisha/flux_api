@@ -38,4 +38,40 @@
     {% endfor %}
   </div>
 </div>
+
+<script>
+  async function fetchJobs() {
+    try {
+      const response = await fetch('{{ root_path }}/jobs/json');
+      const jobs = await response.json();
+      updateJobsTable(jobs);
+    } catch (err) {
+      console.error("Failed to fetch jobs:", err);
+    }
+  }
+
+  function updateJobsTable(jobs) {
+    const container = document.getElementById("job-container");
+    if (!container) return;
+
+    container.innerHTML = ""; // Clear existing content
+
+    jobs.forEach(job => {
+      const div = document.createElement("div");
+      div.className = "p-3 mb-2 rounded bg-gray-800";
+      div.innerHTML = `
+        <div class="font-bold">${job.prompt}</div>
+        <div class="text-sm text-gray-400">Status: ${job.status}</div>
+        <div class="text-xs">Updated: ${job.end_time || job.start_time || "—"}</div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  // Initial fetch
+  fetchJobs();
+
+  // Poll every 30s
+  setInterval(fetchJobs, 30000);
+</script>
 {% endblock %}
