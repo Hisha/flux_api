@@ -103,8 +103,7 @@ def dashboard(request: Request):
         return priority.get(job["status"], 99)  # unknown statuses go last
 
     # Pull a larger pool, sort by priority, then cut to 50
-    all_jobs = get_recent_jobs(limit=500)  # you can increase if needed
-    jobs = sorted(all_jobs, key=sort_job_priority)[:50]
+    jobs = get_recent_jobs(limit=50)
 
     metrics = get_job_metrics()
     return templates.TemplateResponse("index.html", {
