@@ -205,8 +205,7 @@ def jobs_json(status: str = Query(None), limit: int = Query(50)):
 async def job_dashboard(
     request: Request,
     status: str = Query("all"),
-    q: str = Query(""),
-    db: sqlite3.Connection = Depends(get_db)
+    q: str = Query("")
 ):
     jobs = get_recent_jobs(status=status)
     if q:
