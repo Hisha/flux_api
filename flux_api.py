@@ -61,6 +61,16 @@ def require_token(authorization: str = Header(None), request: Request = None):
     if token != expected_token and not is_authenticated(request):
         raise HTTPException(status_code=403, detail="Unauthorized")
 
+def sort_job_priority(job):
+    priority = {
+        "in_progress": 0,
+        "processing": 0,
+        "failed": 1,
+        "queued": 2,
+        "done": 3
+    }
+    return priority.get(job["status"], 99), job.get("start_time", "")
+
 #####################################################################################
 #                                   GET                                             #
 #####################################################################################
@@ -176,8 +186,10 @@ def get_image(filename: str):
 
 @app.get("/jobs/json")
 def jobs(status: str = Query(None), limit: int = Query(50)):
-    return get_recent_jobs(limit=limit, status=status)
-
+    jobs = get_recent_jobs(limit=limit, status=status)
+    jobs = sorted(jobs, key=sort_job_priority)
+    return jobs
+    
 @app.get("/jobs", response_class=HTMLResponse)
 def list_jobs(request: Request, status: str = "all", q: str = ""):
     require_login(request)
