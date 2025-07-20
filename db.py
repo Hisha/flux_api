@@ -221,14 +221,6 @@ def get_recent_jobs(limit=50, status=None):
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
-    status_priority = {
-        "in_progress": 0,
-        "processing": 0,
-        "failed": 1,
-        "queued": 2,
-        "done": 3
-    }
-
     query = "SELECT * FROM jobs"
     values = []
 
@@ -240,17 +232,22 @@ def get_recent_jobs(limit=50, status=None):
     rows = c.fetchall()
     conn.close()
 
-    def safe_time(job):
-        ts = job["end_time"] or job["start_time"]
-        try:
-            return datetime.fromisoformat(ts)
-        except:
-            return datetime.min  # oldest if time is invalid/missing
+    status_priority = {
+        "in_progress": 0,
+        "processing": 0,
+        "failed": 1,
+        "queued": 2,
+        "done": 3
+    }
 
     def sort_key(job):
         prio = status_priority.get(job["status"], 99)
-        ts = safe_time(job)
-        return (prio, -ts.timestamp())
+        raw_ts = job.get("end_time") or job.get("start_time")
+        try:
+            ts = datetime.fromisoformat(raw_ts).timestamp()
+        except:
+            ts = 0
+        return (prio, -ts)
 
     return sorted([dict(r) for r in rows], key=sort_key)[:limit]
 
