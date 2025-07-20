@@ -79,7 +79,10 @@ def sort_job_priority(job):
     }
     sort_key = priority.get(job["status"], 99)
     timestamp = parse_time(job.get("end_time") or job.get("start_time"))
-    # Newest first: use negative timestamp
+    
+    # DEBUG:
+    print(f"[SORT] job_id={job.get('job_id')} status={job.get('status')} time={timestamp.isoformat()} -> sort=({sort_key}, {-timestamp.timestamp()})")
+
     return (sort_key, -timestamp.timestamp())
 
 #####################################################################################
