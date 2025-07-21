@@ -20,28 +20,8 @@
     id="job-container"
     hx-get="{{ root_path }}/partials/recent_jobs"
     hx-trigger="load, every 30s"
-    hx-swap="outerHTML"
+    hx-swap="innerHTML"
     class="space-y-4">
   </div>
 </div>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    console.log("Page Loaded, HTMX:", typeof htmx !== 'undefined' ? "Loaded ✅" : "Not Found ❌");
-  });
-
-  if (typeof htmx !== 'undefined') {
-    htmx.on("htmx:afterRequest", function(evt) {
-      console.log("[HTMX] Request made:", evt.detail.pathInfo.requestPath);
-    });
-
-    htmx.on("htmx:beforeSwap", function(evt) {
-      console.log("[HTMX] Content being swapped in.");
-    });
-
-    htmx.on("htmx:responseError", function(evt) {
-      console.error("[HTMX] Error:", evt.detail);
-    });
-  }
-</script>
-
 {% endblock %}
