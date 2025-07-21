@@ -75,11 +75,11 @@ def require_token(authorization: str = Header(None), request: Request = None):
 
 def sort_job_priority(job):
     priority = {
-        "processing": 4,
-        "in_progress": 4,
-        "queued": 3,
-        "done": 2,
-        "failed": 1
+        "processing": 1,
+        "in_progress": 1,
+        "queued": 2,
+        "failed": 3,
+        "done": 4
     }
     return (
         -priority.get(job["status"], 0),  # High priority first
