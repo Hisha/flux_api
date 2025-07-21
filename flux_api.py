@@ -192,7 +192,7 @@ def get_image(filename: str):
 @app.get("/jobs/json")
 def jobs_json(status: str = Query(None), limit: int = Query(50)):
     jobs = get_recent_jobs(limit=limit, status=status)
-    jobs = sorted(jobs, key=sort_job_priority)
+    jobs = sorted(jobs, key=sort_job_priority, reverse=True)
     return jobs
     
 @app.get("/jobs", response_class=HTMLResponse)
