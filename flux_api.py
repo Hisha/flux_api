@@ -202,7 +202,7 @@ async def job_dashboard(
     jobs = get_recent_jobs(status=status)
     if q:
         jobs = [j for j in jobs if q.lower() in j["prompt"].lower()]
-    jobs = sorted(jobs, key=sort_job_priority, reverse=True)
+    jobs = sorted(jobs, key=sort_job_priority)
 
     return templates.TemplateResponse("jobs.html", {
         "request": request,
