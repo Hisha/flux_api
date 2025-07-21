@@ -266,6 +266,24 @@ def logout(request: Request):
 def metrics_json():
     return get_job_metrics()
 
+@app.get("/partials/job_table", response_class=HTMLResponse)
+async def partial_job_table(
+    request: Request,
+    status: str = Query("all"),
+    q: str = Query("")
+):
+    jobs = get_recent_jobs(status=status)
+    if q:
+        jobs = [j for j in jobs if q.lower() in j["prompt"].lower()]
+    jobs = sorted(jobs, key=sort_job_priority)
+
+    return templates.TemplateResponse("partials/_job_table.html", {
+        "request": request,
+        "jobs": jobs,
+        "status_filter": status,
+        "search_query": q
+    })
+
 @app.get("/partials/recent_jobs", response_class=HTMLResponse)
 def partial_recent_jobs(request: Request):
     jobs = get_recent_jobs(limit=50)
