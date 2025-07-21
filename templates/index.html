@@ -19,78 +19,25 @@
   <div class="space-y-4" id="job-container">
     {% for job in jobs %}
       <div class="p-3 mb-2 rounded bg-gray-800">
-        <div class="font-bold">{{ job.prompt }}</div>
-        <div class="text-sm text-gray-400">Status: {{ job.status }}</div>
-        <div class="text-xs">Updated: {{ job.end_time or job.start_time or "—" }}</div>
+        <div class="font-bold">
+          <a href="{{ root_path }}/job/{{ job.job_id }}" class="text-white no-underline hover:underline">
+            {{ job.prompt }}
+          </a>
+        </div>
+        <div class="text-sm text-gray-400">
+          <span class="text-xs px-2 py-1 rounded 
+            {% if job.status == 'done' %}bg-green-700
+            {% elif job.status == 'failed' %}bg-red-700
+            {% elif job.status == 'queued' %}bg-yellow-700
+            {% elif job.status in ['processing', 'in_progress'] %}bg-blue-700
+            {% else %}bg-gray-700{% endif %}
+            text-white">
+            {{ job.status }}
+          </span>
+        </div>
+        <div class="text-xs">Updated: {{ job.end_time | localtime if job.end_time else job.start_time | localtime }}</div>
       </div>
     {% endfor %}
   </div>
 </div>
-
-<script>
-  async function fetchJobs() {
-    try {
-      const response = await fetch('{{ root_path }}/jobs/json');
-      const jobs = await response.json();
-      updateJobsTable(jobs);
-    } catch (err) {
-      console.error("Failed to fetch jobs:", err);
-    }
-  }
-
-  function updateJobsTable(jobs) {
-  const container = document.getElementById("job-container");
-  if (!container) return;
-
-  container.innerHTML = ""; // Clear existing content
-
-  // Sort jobs based on priority order
-  const priority = {
-    "in_progress": 0,
-    "processing": 0,
-    "failed": 1,
-    "queued": 2,
-    "done": 3
-  };
-
-  jobs.sort((a, b) => {
-    const aPriority = priority[a.status] ?? 99;
-    const bPriority = priority[b.status] ?? 99;
-    return aPriority - bPriority;
-  });
-
-  jobs.forEach(job => {
-    const div = document.createElement("div");
-    div.className = "p-3 mb-2 rounded bg-gray-800";
-
-    let statusColor = "bg-gray-700";
-    if (job.status === "done") statusColor = "bg-green-700";
-    else if (job.status === "failed") statusColor = "bg-red-700";
-    else if (job.status === "queued") statusColor = "bg-yellow-700";
-    else if (job.status === "processing" || job.status === "in_progress") statusColor = "bg-blue-700";
-
-    div.innerHTML = `
-      <div class="flex justify-between items-center mb-1">
-        <div class="font-bold">
-          <a href="{{ root_path }}/job/${job.job_id}" class="text-white">
-            ${job.prompt}
-          </a>
-        </div>
-        <span class="text-xs px-2 py-1 rounded ${statusColor} text-white">
-          ${job.status}
-        </span>
-      </div>
-      <div class="text-sm text-gray-400">Updated: ${job.end_time || job.start_time || "—"}</div>
-    `;
-
-    container.appendChild(div);
-  });
-}
-
-
-  // Initial fetch and polling
-  fetchJobs();
-  setInterval(fetchJobs, 30000);
-</script>
-
 {% endblock %}
