@@ -82,6 +82,34 @@
     }
   }
 
+  function formatLocalTime(isoStr) {
+  try {
+    const date = new Date(isoStr);
+    return date.toLocaleString("en-US", {
+      timeZone: "America/New_York",  // Adjust as needed
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    });
+  } catch {
+    return isoStr;
+  }
+}
+
+  function statusClass(status) {
+  switch (status) {
+    case "done": return "bg-green-700";
+    case "failed": return "bg-red-700";
+    case "queued": return "bg-yellow-700";
+    case "processing":
+    case "in_progress": return "bg-blue-700";
+    default: return "bg-gray-700";
+  }
+}
+
   function updateJobsTable(jobs) {
     const container = document.getElementById("job-container");
     container.innerHTML = "";
@@ -93,11 +121,11 @@
       const html = `
         <div class="flex justify-between items-center mb-2">
           <h2 class="text-lg font-semibold">${job.prompt}</h2>
-          <span class="text-sm px-2 py-1 rounded bg-gray-700">${job.status}</span>
+          <span class="text-sm px-2 py-1 rounded text-white ${statusClass(job.status)}">${job.status}</span>
         </div>
         <div class="text-sm text-gray-400 mb-2">
           <strong>Job ID:</strong> ${job.job_id}<br>
-          <strong>Created:</strong> ${job.start_time}<br>
+          <strong>Created:</strong> ${formatLocalTime(job.start_time)}<br>
           <strong>Filename:</strong> ${job.filename || "N/A"}
         </div>
         ${job.status === "done" && job.filename ? `
