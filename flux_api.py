@@ -284,6 +284,11 @@ async def partial_job_table(
         "search_query": q
     })
 
+@app.get("/partials/metrics", response_class=HTMLResponse)
+def partial_metrics(request: Request):
+    metrics = get_job_metrics()
+    return templates.TemplateResponse("partials/_metrics.html", {"request": request, "metrics": metrics})
+
 @app.get("/partials/recent_jobs", response_class=HTMLResponse)
 def partial_recent_jobs(request: Request):
     jobs = get_recent_jobs(limit=50)
