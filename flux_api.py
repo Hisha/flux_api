@@ -266,6 +266,14 @@ def logout(request: Request):
 def metrics_json():
     return get_job_metrics()
 
+@app.get("/partials/recent_jobs", response_class=HTMLResponse)
+def partial_recent_jobs(request: Request):
+    jobs = get_recent_jobs(limit=50)
+    return templates.TemplateResponse("partials/_recent_jobs.html", {
+        "request": request,
+        "jobs": jobs
+    })
+
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     return templates.TemplateResponse("privacy.html", {"request": request})
