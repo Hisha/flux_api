@@ -73,35 +73,12 @@ def require_token(authorization: str = Header(None), request: Request = None):
     if token != expected_token and not is_authenticated(request):
         raise HTTPException(status_code=403, detail="Unauthorized")
 
-def sort_job_priority(job):
-    priority = {
-        "in_progress": 0,
-        "processing": 0,
-        "failed": 1,
-        "queued": 2,
-        "done": 3
-    }
-    sort_key = priority.get(job["status"], 99)
-    ts_raw = job.get("end_time") or job.get("start_time")
-    timestamp = parse_time(ts_raw)
-    logger.info(f"[SORT] {job.get('job_id')} | {job.get('status')} | {ts_raw} → sort=({sort_key}, {-timestamp.timestamp()})")
-    return (sort_key, -timestamp.timestamp())
-
 #####################################################################################
 #                                   GET                                             #
 #####################################################################################
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
-    def sort_key(job):
-        priority = {
-            "in_progress": 0,
-            "failed": 1,
-            "queued": 2,
-            "done": 3
-        }
-        return priority.get(job["status"], 99)  # unknown statuses go last
-
     # Pull a larger pool, sort by priority, then cut to 50
     jobs = get_recent_jobs(limit=50)
 
