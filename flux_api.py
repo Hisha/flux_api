@@ -99,8 +99,7 @@ def dashboard(request: Request):
     return templates.TemplateResponse("index.html", {
         "request": request,
         "jobs": jobs,
-        "metrics": metrics,
-        "auto_refresh": True
+        "metrics": metrics
     })
 
 @app.get("/admin", response_class=HTMLResponse)
@@ -176,8 +175,7 @@ def view_gallery(request: Request, job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     return templates.TemplateResponse("gallery_detail.html", {
         "request": request,
-        "job": job,
-        "auto_refresh": False
+        "job": job
     })
 
 @app.get("/images/{filename}")
@@ -229,8 +227,7 @@ def view_job(request: Request, job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     return templates.TemplateResponse("job_detail.html", {
         "request": request,
-        "job": job,
-        "auto_refresh": False
+        "job": job
     })
 
 @app.get("/linkable", response_class=HTMLResponse)
