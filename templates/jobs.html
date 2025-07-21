@@ -4,7 +4,14 @@
 <h1 class="text-3xl font-bold mb-6">🧠 FBN Upload Job Dashboard</h1>
 
 <!-- Prompt Submission Form -->
-<form id="generateForm" class="mb-6 flex gap-2">
+<form 
+  id="generateForm"
+  class="mb-6 flex gap-2"
+  hx-post="{{ root_path }}/generate"
+  hx-target="#job-container"
+  hx-swap="none"
+  hx-on::after-request="this.reset(); htmx.trigger('#job-container', 'refresh')"
+>
   <textarea id="promptInput" name="prompt" placeholder="Enter prompt..." 
     class="w-full p-2 bg-gray-800 border border-gray-600 rounded text-white resize-y leading-tight"
     rows="4"></textarea>
