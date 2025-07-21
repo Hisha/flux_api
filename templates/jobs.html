@@ -54,7 +54,7 @@
   id="job-container"
   hx-get="{{ root_path }}/partials/job_table?status={{ status_filter }}&q={{ search_query }}"
   hx-trigger="load, every 30s"
-  hx-swap="outerHTML"
+  hx-swap="innerHTML"
   class="space-y-6">
 </div>
 {% endblock %}
