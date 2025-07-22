@@ -115,7 +115,7 @@ def admin_panel(request: Request):
             full_path = os.path.join(LINKABLE_DIR, f)
             if os.path.isfile(full_path):
                 mtime = os.path.getmtime(full_path)
-                linkable_files.append((f, mtime))
+                llinkable_files.append((f, format_local_time(datetime.utcfromtimestamp(mtime).isoformat())))
         # Sort by most recent modified time
         linkable_files.sort(key=lambda x: x[1], reverse=True)
     except Exception:
