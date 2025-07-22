@@ -49,6 +49,14 @@ def add_job(job_id, prompt, steps, guidance_scale, height, width, autotune, file
     conn.commit()
     conn.close()
 
+def count_jobs_by_status(status: str) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM jobs WHERE status = ?", (status,))
+    count = c.fetchone()[0]
+    conn.close()
+    return count
+
 def delete_old_jobs(days=7):
     cutoff = datetime.utcnow().timestamp() - (days * 86400)
     conn = sqlite3.connect(DB_PATH)
