@@ -20,6 +20,8 @@ import uuid
 import pytz
 from dateutil import parser
 import logging
+import shutil
+import psutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -134,10 +136,34 @@ def metrics(request: Request):
 @app.get("/admin/system")
 def admin_system_info(request: Request):
     require_login(request)
+
+    # Disk usage
+    disk = shutil.disk_usage(os.path.expanduser("~/FluxImages"))
+    disk_total = round(disk.total / (1024**3), 1)  # GB
+    disk_used = round(disk.used / (1024**3), 1)
+    disk_free = round(disk.free / (1024**3), 1)
+
+    # RAM usage
+    mem = psutil.virtual_memory()
+    memory_total = round(mem.total / (1024**3), 1)
+    memory_used = round(mem.used / (1024**3), 1)
+    memory_percent = mem.percent
+
+    # Job/queue info
+    active_queue = count_jobs_by_status("queued")
+    active_workers = count_jobs_by_status("in_progress")
+
     return {
         "cpu_cores": multiprocessing.cpu_count(),
         "output_dir": OUTPUT_DIR,
-        "active_queue_length": count_jobs_by_status("queued")
+        "active_queue_length": active_queue,
+        "active_workers": active_workers,
+        "disk_total_gb": disk_total,
+        "disk_used_gb": disk_used,
+        "disk_free_gb": disk_free,
+        "memory_total_gb": memory_total,
+        "memory_used_gb": memory_used,
+        "memory_percent": memory_percent
     }
 
 import random
