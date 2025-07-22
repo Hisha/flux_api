@@ -5,11 +5,14 @@
   <h1 class="text-3xl font-bold mb-6">🛠️ Admin Panel</h1>
 
   <div class="bg-gray-800 p-6 rounded shadow mb-8">
-    <h2 class="text-2xl font-semibold mb-4">🖥️ System Info</h2>
+    <h2 class="text-xl font-semibold mb-3">🖥️ System Info</h2>
     <ul class="space-y-2 text-gray-300">
-      <li><strong>CPU Cores:</strong> {{ system.cpu_cores }}</li>
-      <li><strong>Output Directory:</strong> {{ system.output_dir }}</li>
       <li><strong>Active Queue Length:</strong> {{ system.active_queue_length }}</li>
+      <li><strong>Active Workers:</strong> {{ system.active_workers }}</li>
+      <li><strong>CPU Cores:</strong> {{ system.cpu_cores }}</li>
+      <li><strong>Disk Usage:</strong> {{ system.disk_used_gb }} GB used / {{ system.disk_total_gb }} GB total</li>
+      <li><strong>Free Disk:</strong> {{ system.disk_free_gb }} GB</li>
+      <li><strong>Memory:</strong> {{ system.memory_used_gb }} GB used ({{ system.memory_percent }}%) / {{ system.memory_total_gb }} GB total</li>
     </ul>
   </div>
 
