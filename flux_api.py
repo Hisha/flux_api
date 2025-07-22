@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 from auth import verify_password, require_login, is_authenticated
-from db import add_job, get_job, get_job_by_filename, get_job_metrics, get_recent_jobs, delete_old_jobs, get_completed_jobs_for_archive, delete_job, get_all_jobs, get_oldest_queued_job
+from db import add_job, get_job, get_job_by_filename, get_job_metrics, get_recent_jobs, delete_old_jobs, get_completed_jobs_for_archive, delete_job, get_all_jobs, get_oldest_queued_job, count_jobs_by_status
 from job_queue import add_job_to_db_and_queue, clear_queue
 from typing import Optional
 from datetime import datetime
@@ -137,7 +137,7 @@ def admin_system_info(request: Request):
     return {
         "cpu_cores": multiprocessing.cpu_count(),
         "output_dir": OUTPUT_DIR,
-        "note": "Queue length unavailable in DB-based polling model"
+        "active_queue_length": count_jobs_by_status("queued")
     }
 
 import random
