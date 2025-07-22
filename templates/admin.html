@@ -54,7 +54,7 @@
            <p class="text-gray-400 mb-4">No files found in /linkable.</p>
        {% else %}
            <ul class="space-y-3">
-            {% for file, mtime in linkable_files %}
+            {% for file, modified in linkable_files %}
               <li class="bg-gray-800 p-4 rounded shadow flex justify-between items-center">
                 <div>
                   <span class="truncate">{{ file }}</span><br>
