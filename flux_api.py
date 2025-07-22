@@ -108,10 +108,14 @@ def admin_panel(request: Request):
     system = admin_system_info(request)
     metrics = get_job_metrics()
     try:
-        linkable_files = [
-            f for f in os.listdir(LINKABLE_DIR)
-            if os.path.isfile(os.path.join(LINKABLE_DIR, f))
-        ]
+        linkable_files = []
+        for f in os.listdir(LINKABLE_DIR):
+            full_path = os.path.join(LINKABLE_DIR, f)
+            if os.path.isfile(full_path):
+                mtime = os.path.getmtime(full_path)
+                linkable_files.append((f, mtime))
+        # Sort by most recent modified time
+        linkable_files.sort(key=lambda x: x[1], reverse=True)
     except Exception:
         linkable_files = []
 
