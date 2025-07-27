@@ -455,18 +455,7 @@ def generate_from_form(
 
 @app.post("/generate/json")
 def generate_from_json(payload: PromptRequest, request: Request, auth=Depends(require_token)):
-    # Clip token limit enforcement (basic whitespace-based tokenizer)
-    max_tokens = 77
-    original_prompt = payload.prompt.strip()
-    tokens = original_prompt.split()
-
-    if len(tokens) > max_tokens:
-        truncated_prompt = ' '.join(tokens[:max_tokens])
-        payload.prompt = truncated_prompt
-        print(f"[CLIP LIMIT] Truncated prompt from {len(tokens)} to {max_tokens} tokens for job submission.")
-    else:
-        payload.prompt = original_prompt
-
+    payload.prompt = payload.prompt.strip()
     job_info = add_job_to_db_and_queue(payload.dict())
     return {
         "message": "Job submitted successfully",
