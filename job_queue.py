@@ -49,15 +49,22 @@ def add_job_to_db_and_queue(params):
         autotune=params.get("autotune", True),
         filename=internal_filename,
         output_dir=output_dir,
-        custom_filename=custom_filename  # <-- ensures it lands in DB
+        custom_filename=custom_filename
     )
+
+    # Store additional info for the queue processor (init_image + strength)
+    # We do NOT store these in DB table yet, unless you want to extend schema
+    params["job_id"] = job_id
+    params["internal_filename"] = internal_filename
+    params["output_dir"] = output_dir
+    params["custom_filename"] = custom_filename
 
     return {
         "job_id": job_id,
         "status": "queued",
         "filename": internal_filename,
         "output_dir": output_dir,
-        "custom_filename": requested_filename  # Optional info for downstream
+        "custom_filename": requested_filename
     }
 
 def clear_queue():
@@ -80,6 +87,7 @@ def run_worker():
             update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Output dir error: {e}")
             continue
 
+        # ✅ Build command for run_flux.py
         cmd = [
             "/home/smithkt/flux_schnell_cpu/flux_env/bin/python",
             "/home/smithkt/flux_schnell_cpu/run_flux.py",
@@ -94,34 +102,38 @@ def run_worker():
         if job.get("autotune"):
             cmd.append("--autotune")
 
+        # ✅ Add img2img parameters if present
+        if job.get("init_image"):
+            cmd.extend(["--init_image", job["init_image"]])
+        if job.get("strength"):
+            cmd.extend(["--strength", str(job["strength"])])
+
         try:
             subprocess.run(cmd, check=True)
 
-            
-            # Check if we need to copy to a custom output_dir with a custom filename
+            # ✅ Copy/rename logic
             original_path = os.path.join(OUTPUT_DIR, job["filename"])
             try:
-               dest_dir = job.get("output_dir", OUTPUT_DIR)
-               custom_filename = job.get("custom_filename")
+                dest_dir = job.get("output_dir", OUTPUT_DIR)
+                custom_filename = job.get("custom_filename")
 
-               if custom_filename:
-                   # Sanitize and ensure .png extension
-                   custom_filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', custom_filename)
-                   if not custom_filename.lower().endswith(".png"):
-                       custom_filename += ".png"
-                   dest_path = os.path.join(dest_dir, custom_filename)
+                if custom_filename:
+                    # Sanitize and ensure .png extension
+                    custom_filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', custom_filename)
+                    if not custom_filename.lower().endswith(".png"):
+                        custom_filename += ".png"
+                    dest_path = os.path.join(dest_dir, custom_filename)
 
-                   # Copy with rename
-                   shutil.copy2(original_path, dest_path)
-                   print(f"✅ Copied and renamed to: {dest_path}")
-               elif os.path.abspath(dest_dir) != os.path.abspath(OUTPUT_DIR):
-                   # Just copy with same filename if no rename
-                   dest_path = os.path.join(dest_dir, job["filename"])
-                   shutil.copy2(original_path, dest_path)
-                   print(f"✅ Copied to: {dest_path}")
+                    # Copy with rename
+                    shutil.copy2(original_path, dest_path)
+                    print(f"✅ Copied and renamed to: {dest_path}")
+                elif os.path.abspath(dest_dir) != os.path.abspath(OUTPUT_DIR):
+                    # Just copy with same filename if no rename
+                    dest_path = os.path.join(dest_dir, job["filename"])
+                    shutil.copy2(original_path, dest_path)
+                    print(f"✅ Copied to: {dest_path}")
             except Exception as copy_err:
-               print(f"⚠️ Failed to copy to output_dir: {copy_err}")
-
+                print(f"⚠️ Failed to copy to output_dir: {copy_err}")
 
             update_job_status(job_id, "done", end_time=datetime.utcnow().isoformat())
 
