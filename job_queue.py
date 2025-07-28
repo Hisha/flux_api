@@ -89,59 +89,52 @@ def run_worker():
             update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Output dir error: {e}")
             continue
 
+        # ✅ Build base command
         cmd = [
-                "/home/smithkt/flux_schnell_cpu/flux_env/bin/python",
-                "/home/smithkt/flux_schnell_cpu/run_flux.py",
-                "--prompt", job["prompt"],
-                "--output", job["filename"],
-                "--output_dir", job.get("output_dir", OUTPUT_DIR),
-                "--flux_model_path", "/home/smithkt/flux_schnell_cpu/flux_schnell_local",
-                "--sd_model_path", "/home/smithkt/SD1.5"
+            "/home/smithkt/flux_schnell_cpu/flux_env/bin/python",
+            "/home/smithkt/flux_schnell_cpu/run_flux.py",
+            "--prompt", job["prompt"],
+            "--output", job["filename"],
+            "--output_dir", job.get("output_dir", OUTPUT_DIR)
         ]
 
-        # ✅ Flux Schnell parameters (txt2img)
-        cmd.extend([
+        if job.get("init_image"):
+            # ✅ SD1.5 img2img mode
+            cmd.extend([
+                "--init_image", job["init_image"],
+                "--strength", str(job.get("strength", 0.6)),
+                "--sd_model_path", "/home/smithkt/SD1.5",
+                "--guidance_scale", "7.5",
+                "--steps", "20"  # Standard for SD img2img
+            ])
+        else:
+            # ✅ Flux Schnell txt2img mode
+            cmd.extend([
+                "--flux_model_path", "/home/smithkt/flux_schnell_cpu/flux_schnell_local",
                 "--steps", str(job.get("steps", 4)),
                 "--guidance_scale", str(job.get("guidance_scale", 3.5)),
                 "--height", str(job.get("height", 1024)),
                 "--width", str(job.get("width", 1024))
-        ])
+            ])
 
-        # ✅ Autotune if enabled
         if job.get("autotune"):
             cmd.append("--autotune")
 
-        # ✅ Img2Img extra params
-        if job.get("init_image"):
-            cmd.extend([
-                "--init_image", job["init_image"],
-                "--strength", str(job.get("strength", 0.6)),
-                "--steps", "20",  # SD default for img2img
-                "--guidance_scale", "7.5"
-            ])
-
-
+        # ✅ Execute generation
         try:
             subprocess.run(cmd, check=True)
 
-            # ✅ Copy/rename logic
+            # ✅ Copy/rename if needed
             original_path = os.path.join(OUTPUT_DIR, job["filename"])
             try:
                 dest_dir = job.get("output_dir", OUTPUT_DIR)
                 custom_filename = job.get("custom_filename")
 
                 if custom_filename:
-                    # Sanitize and ensure .png extension
-                    custom_filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', custom_filename)
-                    if not custom_filename.lower().endswith(".png"):
-                        custom_filename += ".png"
-                    dest_path = os.path.join(dest_dir, custom_filename)
-
-                    # Copy with rename
+                    dest_path = os.path.join(dest_dir, custom_filename if custom_filename.endswith(".png") else custom_filename + ".png")
                     shutil.copy2(original_path, dest_path)
                     print(f"✅ Copied and renamed to: {dest_path}")
                 elif os.path.abspath(dest_dir) != os.path.abspath(OUTPUT_DIR):
-                    # Just copy with same filename if no rename
                     dest_path = os.path.join(dest_dir, job["filename"])
                     shutil.copy2(original_path, dest_path)
                     print(f"✅ Copied to: {dest_path}")
