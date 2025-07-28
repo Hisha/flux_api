@@ -45,8 +45,8 @@
       <label for="gallery_image" class="block font-medium">Or Select from Gallery</label>
       <select name="gallery_image" id="gallery_image" class="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white">
         <option value="">-- None --</option>
-        {% for img in jobs[:20] %}  <!-- Show last 20 generated images -->
-          <option value="{{ img.filename }}">{{ img.filename }}</option>
+          {% for filename in gallery_images %}
+            <option value="{{ filename }}">{{ filename }}</option>
         {% endfor %}
       </select>
     </div>
