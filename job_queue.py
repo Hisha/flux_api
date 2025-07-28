@@ -49,7 +49,7 @@ def add_job_to_db_and_queue(params):
         autotune=params.get("autotune", True),
         filename=internal_filename,
         output_dir=output_dir,
-        custom_filename=custom_filename
+        custom_filename=custom_filename,
         init_image=params.get("init_image"),
         strength=params.get("strength")
     )
