@@ -114,6 +114,8 @@ def run_worker():
         # ✅ Img2Img extra params
         if job.get("init_image"):
             cmd.extend([
+                "--init_image", job["init_image"],
+                "--strength", str(job.get("strength", 0.6)),
                 "--steps", "20",  # SD default for img2img
                 "--guidance_scale", "7.5"
             ])
