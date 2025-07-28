@@ -5,7 +5,7 @@ import os
 import sqlite3
 import multiprocessing
 import random
-from fastapi import FastAPI, HTTPException, Query, Request, Form, status, Header, Depends, APIRouter, Body
+from fastapi import FastAPI, HTTPException, Query, Request, Form, status, Header, Depends, APIRouter, Body, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
