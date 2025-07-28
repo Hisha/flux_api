@@ -4,14 +4,8 @@
 <h1 class="text-3xl font-bold mb-6">🧠 FBN Upload Job Dashboard</h1>
 
 <!-- Prompt Submission Form -->
-<form 
-  id="generateForm"
-  class="mb-6 flex gap-2"
-  hx-post="{{ root_path }}/generate"
-  hx-target="#job-container"
-  hx-swap="none"
-  hx-on::after-request="this.reset(); htmx.trigger('#job-container', 'refresh')"
->
+<form id="generateForm" class="mb-6 flex flex-col gap-4" enctype="multipart/form-data" method="post" action="{{ root_path }}/generate">
+  <!-- Prompt Textarea -->
   <textarea id="promptInput" name="prompt" placeholder="Enter prompt..." 
     class="w-full p-2 bg-gray-800 border border-gray-600 rounded text-white resize-y leading-tight"
     rows="4"></textarea>
@@ -38,13 +32,27 @@
       <label for="filename" class="block font-medium">Filename (optional)</label>
       <input type="text" name="filename" id="filename" class="w-full p-1 bg-gray-800 rounded border border-gray-700">
     </div>
+  </div>
+
+  <!-- Img2Img Options -->
+  <div class="bg-gray-900 p-4 rounded space-y-3">
+    <h3 class="text-lg font-semibold text-white">Img2Img Options</h3>
     <div>
-      <label for="init_image" class="block font-medium">Initial Image (optional)</label>
-      <input type="file" name="init_image" id="init_image" class="w-full text-white">
+      <label for="init_image" class="block font-medium">Upload Init Image</label>
+      <input type="file" name="init_image" id="init_image" accept="image/*" class="text-white">
     </div>
     <div>
-      <label for="strength" class="block font-medium">Strength (0.0-1.0)</label>
-      <input type="number" step="0.05" min="0" max="1" name="strength" id="strength" value="0.75" class="w-full p-1 bg-gray-800 rounded border border-gray-700">
+      <label for="gallery_image" class="block font-medium">Or Select from Gallery</label>
+      <select name="gallery_image" id="gallery_image" class="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white">
+        <option value="">-- None --</option>
+        {% for img in jobs[:20] %}  <!-- Show last 20 generated images -->
+          <option value="{{ img.filename }}">{{ img.filename }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="strength" class="block font-medium">Strength (0.0 - 1.0)</label>
+      <input type="number" step="0.05" min="0.0" max="1.0" name="strength" id="strength" value="0.75" class="w-full p-1 bg-gray-800 rounded border border-gray-700">
     </div>
   </div>
 
