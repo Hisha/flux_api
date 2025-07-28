@@ -238,9 +238,15 @@ async def job_dashboard(
         jobs = [j for j in jobs if q.lower() in j["prompt"].lower()]
     jobs = sorted(jobs, key=sort_job_priority, reverse=True)
 
+    # ✅ Fetch all gallery images sorted by filename
+    image_dir = os.path.expanduser("~/FluxImages")
+    gallery_images = [f for f in os.listdir(image_dir) if f.lower().endswith(".png")]
+    gallery_images.sort()  # Sort alphabetically; use reverse=True for reverse order
+
     return templates.TemplateResponse("jobs.html", {
         "request": request,
         "jobs": jobs,
+        "gallery_images": gallery_images,  # Pass to template
         "status_filter": status,
         "search_query": q
     })
