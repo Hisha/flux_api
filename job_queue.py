@@ -89,26 +89,35 @@ def run_worker():
             update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Output dir error: {e}")
             continue
 
-        # ✅ Build command for run_flux.py
         cmd = [
-            "/home/smithkt/flux_schnell_cpu/flux_env/bin/python",
-            "/home/smithkt/flux_schnell_cpu/run_flux.py",
-            "--prompt", job["prompt"],
-            "--output", job["filename"],
-            "--steps", str(job["steps"]),
-            "--guidance_scale", str(job["guidance_scale"]),
-            "--height", str(job["height"]),
-            "--width", str(job["width"]),
-            "--output_dir", OUTPUT_DIR
+                "/home/smithkt/flux_schnell_cpu/flux_env/bin/python",
+                "/home/smithkt/flux_schnell_cpu/run_flux.py",
+                "--prompt", job["prompt"],
+                "--output", job["filename"],
+                "--output_dir", job.get("output_dir", OUTPUT_DIR),
+                "--flux_model_path", "/home/smithkt/flux_schnell_cpu/flux_schnell_local",
+                "--sd_model_path", "/home/smithkt/SD1.5"
         ]
+
+        # ✅ Flux Schnell parameters (txt2img)
+        cmd.extend([
+                "--steps", str(job.get("steps", 4)),
+                "--guidance_scale", str(job.get("guidance_scale", 3.5)),
+                "--height", str(job.get("height", 1024)),
+                "--width", str(job.get("width", 1024))
+        ])
+
+        # ✅ Autotune if enabled
         if job.get("autotune"):
             cmd.append("--autotune")
 
-        # ✅ Add img2img parameters if present
+        # ✅ Img2Img extra params
         if job.get("init_image"):
-            cmd.extend(["--init_image", job["init_image"]])
-        if job.get("strength"):
-            cmd.extend(["--strength", str(job["strength"])])
+            cmd.extend([
+                "--init_image", job["init_image"],
+                "--strength", str(job.get("strength", 0.6))
+            ])
+
 
         try:
             subprocess.run(cmd, check=True)
