@@ -467,7 +467,7 @@ def generate_from_form(
         "height": height,
         "width": width,
         "filename": filename,
-        "autotune": True  # Force autotune to always be enabled,
+        "autotune": True,  # Force autotune to always be enabled
         "init_image": init_image_path,
         "strength": strength
     })
