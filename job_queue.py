@@ -50,6 +50,8 @@ def add_job_to_db_and_queue(params):
         filename=internal_filename,
         output_dir=output_dir,
         custom_filename=custom_filename
+        init_image=params.get("init_image"),
+        strength=params.get("strength")
     )
 
     # Store additional info for the queue processor (init_image + strength)
