@@ -45,8 +45,8 @@
       <label for="gallery_image" class="block font-medium">Or Select from Gallery</label>
       <select name="gallery_image" id="gallery_image" class="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white">
         <option value="">-- None --</option>
-          {% for filename in gallery_images %}
-            <option value="{{ filename }}">{{ filename }}</option>
+        {% for filename in gallery_images %}
+          <option value="{{ filename }}">{{ filename }}</option>
         {% endfor %}
       </select>
     </div>
@@ -80,4 +80,22 @@
   hx-swap="innerHTML"
   class="space-y-6">
 </div>
+
+<!-- JS to prevent conflicts between upload and gallery select -->
+<script>
+  const initImageInput = document.getElementById('init_image');
+  const gallerySelect = document.getElementById('gallery_image');
+
+  initImageInput.addEventListener('change', () => {
+    if (initImageInput.files.length > 0) {
+      gallerySelect.value = '';
+    }
+  });
+
+  gallerySelect.addEventListener('change', () => {
+    if (gallerySelect.value) {
+      initImageInput.value = '';
+    }
+  });
+</script>
 {% endblock %}
