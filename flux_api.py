@@ -483,13 +483,20 @@ def generate_from_form(
 @app.post("/generate/json")
 def generate_from_json(payload: PromptRequest, request: Request, auth=Depends(require_token)):
     payload.prompt = payload.prompt.strip()
+
+    # ✅ Only process img2img validation if init_image is provided
     if payload.init_image:
         candidate = os.path.join(OUTPUT_DIR, payload.init_image)
-    if payload.init_image:
-        candidate = os.path.join(OUTPUT_DIR, payload.init_image)
-    if not os.path.exists(payload.init_image) and not os.path.exists(candidate):
-        raise HTTPException(status_code=404, detail="Init image not found")
-    payload.init_image = payload.init_image if os.path.exists(payload.init_image) else candidate
+
+        if not os.path.exists(payload.init_image) and not os.path.exists(candidate):
+            raise HTTPException(status_code=404, detail="Init image not found")
+
+        # If the original path doesn't exist, use candidate
+        payload.init_image = payload.init_image if os.path.exists(payload.init_image) else candidate
+    else:
+        # If init_image is None, it's a txt2img request, leave it alone
+        payload.init_image = None
+
     job_info = add_job_to_db_and_queue(payload.dict())
     return {
         "message": "Job submitted successfully",
