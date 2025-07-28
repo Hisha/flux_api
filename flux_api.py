@@ -449,31 +449,48 @@ def generate_from_form(
     width: int = Form(1024),
     filename: Optional[str] = Form(None),
     strength: float = Form(0.75),                # img2img
-    init_image: UploadFile = File(None),         # img2img
+    init_image: UploadFile = File(None),         # img2img upload
+    gallery_image: Optional[str] = Form(None)    # img2img from gallery
 ):
     require_login(request)
     init_image_path = None
 
-    if init_image:
-        # Save uploaded image
+    # ✅ Case 1: Uploaded image
+    if init_image and init_image.filename:
         suffix = os.path.splitext(init_image.filename)[-1] or ".png"
         init_image_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}{suffix}")
+
+        # Save uploaded image
         with open(init_image_path, "wb") as buffer:
             shutil.copyfileobj(init_image.file, buffer)
 
-    # Copy to gallery so it appears in main image list
-    gallery_copy = os.path.join(OUTPUT_DIR, f"init_{uuid.uuid4().hex}{suffix}")
-    shutil.copy2(init_image_path, gallery_copy)
-    logger.info(f"Uploaded init image saved as {gallery_copy}")
+        # Validate size (avoid zero-byte files)
+        if os.path.getsize(init_image_path) == 0:
+            os.remove(init_image_path)
+            raise HTTPException(status_code=400, detail="Uploaded image is empty")
 
+        # Copy to gallery
+        gallery_copy = os.path.join(OUTPUT_DIR, f"init_{uuid.uuid4().hex}{suffix}")
+        shutil.copy2(init_image_path, gallery_copy)
+        logger.info(f"Uploaded init image saved as {gallery_copy}")
+
+    # ✅ Case 2: Gallery image selected
+    elif gallery_image:
+        candidate_path = os.path.join(OUTPUT_DIR, gallery_image)
+        if os.path.exists(candidate_path):
+            init_image_path = candidate_path
+        else:
+            raise HTTPException(status_code=404, detail="Selected gallery image not found")
+
+    # ✅ Case 3: Neither provided → leave init_image_path as None
     job_info = add_job_to_db_and_queue({
-        "prompt": prompt,
+        "prompt": prompt.strip(),
         "steps": steps,
         "guidance_scale": guidance_scale,
         "height": height,
         "width": width,
         "filename": filename,
-        "autotune": True,  # Force autotune to always be enabled
+        "autotune": True,  # Force autotune always
         "init_image": init_image_path,
         "strength": strength
     })
