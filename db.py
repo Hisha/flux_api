@@ -33,19 +33,21 @@ def init_db():
         start_time TEXT,
         end_time TEXT,
         error_message TEXT,
-        output_dir TEXT
+        output_dir TEXT,
+        init_image TEXT,
+        strength REAL
     )
     ''')
     conn.commit()
     conn.close()
 
-def add_job(job_id, prompt, steps, guidance_scale, height, width, autotune, filename, output_dir, custom_filename=None):
+def add_job(job_id, prompt, steps, guidance_scale, height, width, autotune, filename, output_dir, custom_filename=None, init_image=None, strength=None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''
-    INSERT INTO jobs (job_id, prompt, steps, guidance_scale, height, width, autotune, status, filename, output_dir, custom_filename)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)
-    ''', (job_id, prompt, steps, guidance_scale, height, width, int(autotune), filename, output_dir, custom_filename))
+    INSERT INTO jobs (job_id, prompt, steps, guidance_scale, height, width, autotune, status, filename, output_dir, custom_filename, init_image, strength)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)
+    ''', (job_id, prompt, steps, guidance_scale, height, width, int(autotune), filename, output_dir, custom_filename, init_image, strength))
     conn.commit()
     conn.close()
 
