@@ -5,7 +5,7 @@ import os
 import sqlite3
 import multiprocessing
 import random
-from fastapi import FastAPI, HTTPException, Query, Request, Form, status, Header, Depends, APIRouter, Body
+from fastapi import FastAPI, HTTPException, Query, Request, Form, status, Header, Depends, APIRouter, Body, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +22,7 @@ from dateutil import parser
 import logging
 import shutil
 import psutil
+import tempfile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,6 +46,8 @@ class PromptRequest(BaseModel):
     autotune: bool = True
     filename: Optional[str] = None  # Optional custom filename
     output_dir: Optional[str] = None
+    init_image: Optional[str] = None   # Path for img2img
+    strength: float = 0.75             # Default img2img strength
 
 def format_local_time(iso_str):
     try:
@@ -430,16 +433,28 @@ def clear_queue_api(auth=Depends(require_token)):
     return {"message": "Queue cleared successfully."}
 
 @app.post("/generate", response_class=HTMLResponse)
-def generate_from_form(
+async def generate_from_form(
     request: Request,
     prompt: str = Form(...),
     steps: int = Form(4),
     guidance_scale: float = Form(3.5),
     height: int = Form(1024),
     width: int = Form(1024),
+    strength: float = Form(0.75),
     filename: Optional[str] = Form(None),
+    init_image: UploadFile = File(None),
 ):
     require_login(request)
+
+    init_image_path = None
+    if init_image:
+        # Save uploaded file to temp dir
+        suffix = os.path.splitext(init_image.filename)[-1] or ".png"
+        tmp_dir = os.path.join(OUTPUT_DIR, "uploads")
+        os.makedirs(tmp_dir, exist_ok=True)
+        init_image_path = os.path.join(tmp_dir, f"{uuid.uuid4().hex}{suffix}")
+        with open(init_image_path, "wb") as buffer:
+            shutil.copyfileobj(init_image.file, buffer)
 
     job_info = add_job_to_db_and_queue({
         "prompt": prompt,
@@ -448,7 +463,9 @@ def generate_from_form(
         "height": height,
         "width": width,
         "filename": filename,
-        "autotune": True  # Force autotune to always be enabled
+        "autotune": True,
+        "init_image": init_image_path,
+        "strength": strength
     })
 
     return RedirectResponse(url=f"{request.scope.get('root_path', '')}/job/{job_info['job_id']}", status_code=303)
