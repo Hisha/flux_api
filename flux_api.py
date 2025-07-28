@@ -38,6 +38,9 @@ API_TOKEN = os.getenv("N8N_API_TOKEN")
 eastern = pytz.timezone("US/Eastern")
 LINKABLE_DIR = "/mnt/ai_data/linkable"
 
+# Add custom Jinja filter for basename
+templates.env.filters["basename"] = lambda path: os.path.basename(path) if path else ""
+
 class PromptRequest(BaseModel):
     prompt: str
     steps: int = 4
