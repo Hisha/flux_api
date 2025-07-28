@@ -15,6 +15,12 @@
       <p><strong>Start Time:</strong> {{ job.start_time | localtime }}</p>
       <p><strong>End Time:</strong> {{ job.end_time | localtime }}</p>
       <p><strong>Filename:</strong> {{ job.filename or "N/A" }}</p>
+      {% if job.init_image %}
+	      <p><string>Init Image:</strong><a href="{{ root_path }}/images/{{ job.init_image | basename }}" target="_blank"> {{ job.init_image | basename }}</p>
+      {% endif %}
+      {% if job.strength is not none %}
+	      <p><strong>Strength: {{ job.strength }}</p>
+      {% endif %}
     </div>
 
     {% if job.status == "done" %}
