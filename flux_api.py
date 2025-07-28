@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(root_path="/flux")
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY"))
 OUTPUT_DIR = os.path.expanduser("~/FluxImages")
+UPLOAD_DIR = os.path.join(OUTPUT_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["root_path"] = "/flux"
 templates.env.globals['now'] = datetime.now
@@ -45,6 +47,8 @@ class PromptRequest(BaseModel):
     autotune: bool = True
     filename: Optional[str] = None  # Optional custom filename
     output_dir: Optional[str] = None
+    init_image: Optional[str] = None   # img2img
+    strength: float = 0.75    #img2img         
 
 def format_local_time(iso_str):
     try:
@@ -438,8 +442,23 @@ def generate_from_form(
     height: int = Form(1024),
     width: int = Form(1024),
     filename: Optional[str] = Form(None),
+    strength: float = Form(0.75),                # img2img
+    init_image: UploadFile = File(None),         # img2img
 ):
     require_login(request)
+    init_image_path = None
+
+    if init_image:
+        # Save uploaded image
+        suffix = os.path.splitext(init_image.filename)[-1] or ".png"
+        init_image_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4().hex}{suffix}")
+        with open(init_image_path, "wb") as buffer:
+            shutil.copyfileobj(init_image.file, buffer)
+
+    # Copy to gallery so it appears in main image list
+    gallery_copy = os.path.join(OUTPUT_DIR, f"init_{uuid.uuid4().hex}{suffix}")
+    shutil.copy2(init_image_path, gallery_copy)
+    logger.info(f"Uploaded init image saved as {gallery_copy}")
 
     job_info = add_job_to_db_and_queue({
         "prompt": prompt,
@@ -448,7 +467,9 @@ def generate_from_form(
         "height": height,
         "width": width,
         "filename": filename,
-        "autotune": True  # Force autotune to always be enabled
+        "autotune": True  # Force autotune to always be enabled,
+        "init_image": init_image_path,
+        "strength": strength
     })
 
     return RedirectResponse(url=f"{request.scope.get('root_path', '')}/job/{job_info['job_id']}", status_code=303)
@@ -456,6 +477,11 @@ def generate_from_form(
 @app.post("/generate/json")
 def generate_from_json(payload: PromptRequest, request: Request, auth=Depends(require_token)):
     payload.prompt = payload.prompt.strip()
+    if payload.init_image:
+        candidate = os.path.join(OUTPUT_DIR, payload.init_image)
+    if not os.path.exists(payload.init_image) and not os.path.exists(candidate):
+        raise HTTPException(status_code=404, detail="Init image not found")
+    payload.init_image = payload.init_image if os.path.exists(payload.init_image) else candidate
     job_info = add_job_to_db_and_queue(payload.dict())
     return {
         "message": "Job submitted successfully",
