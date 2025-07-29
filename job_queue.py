@@ -131,8 +131,8 @@ def run_worker():
                 "--init_image", job["init_image"],
                 "--strength", str(job.get("strength", 0.6)),
                 "--sd_model_path", SD15_MODEL_PATH,
-                "--guidance_scale", "7.5",
-                "--steps", "20"  # Standard SD1.5 img2img
+                "--guidance_scale", "6.5",
+                "--steps", "40"  # Standard SD1.5 img2img
             ]
         else:
             # Use Flux Schnell Txt2Img
