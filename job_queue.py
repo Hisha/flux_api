@@ -101,11 +101,20 @@ def run_worker():
         update_job_status(job_id, "in_progress", start_time=datetime.utcnow().isoformat())
 
         try:
-            output_dir = os.path.abspath(os.path.expanduser(job.get("output_dir", OUTPUT_DIR)))
-            os.makedirs(output_dir, exist_ok=True)
+            # Make sure the user-defined output directory exists
+            user_output_dir = os.path.abspath(os.path.expanduser(job.get("output_dir", OUTPUT_DIR)))
+            os.makedirs(user_output_dir, exist_ok=True)
         except Exception as e:
-            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Output dir error: {e}")
+            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(),
+                              error_message=f"Output dir error: {e}")
             continue
+
+        # ==========================
+        # ✅ Always generate in FluxImages
+        # ==========================
+        internal_save_dir = OUTPUT_DIR
+        internal_filename = job["filename"]
+        internal_path = os.path.join(internal_save_dir, internal_filename)
 
         # ==========================
         # ✅ SELECT MODE & ENV
@@ -117,8 +126,8 @@ def run_worker():
                 python_bin,
                 "/home/smithkt/flux_schnell_cpu/run_flux.py",
                 "--prompt", job["prompt"],
-                "--output", job["filename"],
-                "--output_dir", job.get("output_dir", OUTPUT_DIR),
+                "--output", internal_filename,  # Always internal filename
+                "--output_dir", internal_save_dir,  # Force save in FluxImages
                 "--init_image", job["init_image"],
                 "--strength", str(job.get("strength", 0.6)),
                 "--sd_model_path", SD15_MODEL_PATH,
@@ -132,8 +141,8 @@ def run_worker():
                 python_bin,
                 "/home/smithkt/flux_schnell_cpu/run_flux.py",
                 "--prompt", job["prompt"],
-                "--output", job["filename"],
-                "--output_dir", job.get("output_dir", OUTPUT_DIR),
+                "--output", internal_filename,  # Always internal filename
+                "--output_dir", internal_save_dir,  # Force save in FluxImages
                 "--flux_model_path", FLUX_MODEL_PATH,
                 "--steps", str(job.get("steps", 4)),
                 "--guidance_scale", str(job.get("guidance_scale", 3.5)),
@@ -151,18 +160,18 @@ def run_worker():
             subprocess.run(cmd, check=True)
 
             # ✅ Copy/rename if needed
-            original_path = os.path.join(OUTPUT_DIR, job["filename"])
             try:
-                dest_dir = job.get("output_dir", OUTPUT_DIR)
+                dest_dir = user_output_dir
                 custom_filename = job.get("custom_filename")
 
                 if custom_filename:
-                    dest_path = os.path.join(dest_dir, custom_filename if custom_filename.endswith(".png") else custom_filename + ".png")
-                    shutil.copy2(original_path, dest_path)
+                    dest_path = os.path.join(dest_dir,
+                                             custom_filename if custom_filename.endswith(".png") else custom_filename + ".png")
+                    shutil.copy2(internal_path, dest_path)
                     print(f"✅ Copied and renamed to: {dest_path}")
-                elif os.path.abspath(dest_dir) != os.path.abspath(OUTPUT_DIR):
-                    dest_path = os.path.join(dest_dir, job["filename"])
-                    shutil.copy2(original_path, dest_path)
+                elif os.path.abspath(dest_dir) != os.path.abspath(internal_save_dir):
+                    dest_path = os.path.join(dest_dir, internal_filename)
+                    shutil.copy2(internal_path, dest_path)
                     print(f"✅ Copied to: {dest_path}")
             except Exception as copy_err:
                 print(f"⚠️ Failed to copy to output_dir: {copy_err}")
@@ -170,9 +179,11 @@ def run_worker():
             update_job_status(job_id, "done", end_time=datetime.utcnow().isoformat())
 
         except subprocess.CalledProcessError as e:
-            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Subprocess error: {e}")
+            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(),
+                              error_message=f"Subprocess error: {e}")
         except Exception as e:
-            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Unexpected error: {e}")
+            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(),
+                              error_message=f"Unexpected error: {e}")
 
 # Init DB
 init_db()
