@@ -14,15 +14,29 @@ from db import (
     delete_queued_jobs
 )
 
+# ==========================
+# ✅ CONFIG SECTION
+# ==========================
 OUTPUT_DIR = os.path.expanduser("~/FluxImages")
 
+# Virtual environments for each mode
+FLUX_PYTHON = "/home/smithkt/flux_schnell_cpu/flux_env/bin/python"
+SD15_PYTHON = "/home/smithkt/SD1.5/SD_env/bin/python"
+
+# Model paths
+FLUX_MODEL_PATH = "/home/smithkt/flux_schnell_cpu/flux_schnell_local"
+SD15_MODEL_PATH = "/home/smithkt/SD1.5"
+
+# ==========================
+# ✅ ADD JOB TO DB & QUEUE
+# ==========================
 def add_job_to_db_and_queue(params):
     job_id = uuid.uuid4().hex[:8]
 
-    # Always use random filename internally
+    # Internal filename (always random)
     internal_filename = f"{job_id}.png"
 
-    # If a custom filename is requested for external use
+    # Optional custom filename
     requested_filename = params.get("filename")
     custom_filename = None
     if requested_filename:
@@ -30,7 +44,7 @@ def add_job_to_db_and_queue(params):
         if not custom_filename.lower().endswith(".png"):
             custom_filename += ".png"
 
-    # Handle output_dir override
+    # Output directory
     output_dir = params.get("output_dir")
     if output_dir:
         output_dir = os.path.abspath(os.path.expanduser(output_dir))
@@ -38,7 +52,7 @@ def add_job_to_db_and_queue(params):
     else:
         output_dir = OUTPUT_DIR
 
-    # Write to DB (status = queued)
+    # Insert into DB
     add_job(
         job_id=job_id,
         prompt=params["prompt"],
@@ -54,8 +68,6 @@ def add_job_to_db_and_queue(params):
         strength=params.get("strength")
     )
 
-    # Store additional info for the queue processor (init_image + strength)
-    # We do NOT store these in DB table yet, unless you want to extend schema
     params["job_id"] = job_id
     params["internal_filename"] = internal_filename
     params["output_dir"] = output_dir
@@ -69,9 +81,15 @@ def add_job_to_db_and_queue(params):
         "custom_filename": requested_filename
     }
 
+# ==========================
+# ✅ CLEAR QUEUE
+# ==========================
 def clear_queue():
     delete_queued_jobs()
 
+# ==========================
+# ✅ MAIN WORKER LOOP
+# ==========================
 def run_worker():
     while True:
         job = get_oldest_queued_job()
@@ -89,38 +107,46 @@ def run_worker():
             update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Output dir error: {e}")
             continue
 
-        # ✅ Build base command
-        cmd = [
-            "/home/smithkt/flux_schnell_cpu/flux_env/bin/python",
-            "/home/smithkt/flux_schnell_cpu/run_flux.py",
-            "--prompt", job["prompt"],
-            "--output", job["filename"],
-            "--output_dir", job.get("output_dir", OUTPUT_DIR)
-        ]
-
+        # ==========================
+        # ✅ SELECT MODE & ENV
+        # ==========================
         if job.get("init_image"):
-            # ✅ SD1.5 img2img mode
-            cmd.extend([
+            # Use SD1.5 Img2Img
+            python_bin = SD15_PYTHON
+            cmd = [
+                python_bin,
+                "/home/smithkt/flux_schnell_cpu/run_flux.py",
+                "--prompt", job["prompt"],
+                "--output", job["filename"],
+                "--output_dir", job.get("output_dir", OUTPUT_DIR),
                 "--init_image", job["init_image"],
                 "--strength", str(job.get("strength", 0.6)),
-                "--sd_model_path", "/home/smithkt/SD1.5",
+                "--sd_model_path", SD15_MODEL_PATH,
                 "--guidance_scale", "7.5",
-                "--steps", "20"  # Standard for SD img2img
-            ])
+                "--steps", "20"  # Standard SD1.5 img2img
+            ]
         else:
-            # ✅ Flux Schnell txt2img mode
-            cmd.extend([
-                "--flux_model_path", "/home/smithkt/flux_schnell_cpu/flux_schnell_local",
+            # Use Flux Schnell Txt2Img
+            python_bin = FLUX_PYTHON
+            cmd = [
+                python_bin,
+                "/home/smithkt/flux_schnell_cpu/run_flux.py",
+                "--prompt", job["prompt"],
+                "--output", job["filename"],
+                "--output_dir", job.get("output_dir", OUTPUT_DIR),
+                "--flux_model_path", FLUX_MODEL_PATH,
                 "--steps", str(job.get("steps", 4)),
                 "--guidance_scale", str(job.get("guidance_scale", 3.5)),
                 "--height", str(job.get("height", 1024)),
                 "--width", str(job.get("width", 1024))
-            ])
+            ]
 
         if job.get("autotune"):
             cmd.append("--autotune")
 
-        # ✅ Execute generation
+        # ==========================
+        # ✅ EXECUTE JOB
+        # ==========================
         try:
             subprocess.run(cmd, check=True)
 
@@ -143,8 +169,10 @@ def run_worker():
 
             update_job_status(job_id, "done", end_time=datetime.utcnow().isoformat())
 
+        except subprocess.CalledProcessError as e:
+            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Subprocess error: {e}")
         except Exception as e:
-            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=str(e))
+            update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(), error_message=f"Unexpected error: {e}")
 
 # Init DB
 init_db()
