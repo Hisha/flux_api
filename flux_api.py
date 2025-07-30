@@ -436,7 +436,7 @@ def admin_delete(request: Request, job_id: str):
     path = os.path.join(OUTPUT_DIR, filename)
     if os.path.exists(path):
         os.remove(path)
-    return RedirectResponse(url=f"{request.scope.get('root_path', '')}/admin", status_code=303)
+    return RedirectResponse(url="/jobs", status_code=303)
 
 @app.post("/clear_queue")
 def clear_queue_api(auth=Depends(require_token)):
