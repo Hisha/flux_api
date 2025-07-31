@@ -187,6 +187,11 @@ def run_worker():
             except Exception as copy_err:
                 print(f"⚠️ Failed to copy to output_dir: {copy_err}")
 
+            thumb_dir = os.path.join(OUTPUT_DIR, "thumbnails")
+            os.makedirs(thumb_dir, exist_ok=True)
+            thumb_path = os.path.join(thumb_dir, final_filename)
+            create_thumbnail(final_path, thumb_path)
+
             update_job_status(job_id, "done", end_time=datetime.utcnow().isoformat())
 
         except subprocess.CalledProcessError as e:
