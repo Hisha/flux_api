@@ -5,6 +5,7 @@ import subprocess
 import re
 import shutil
 from datetime import datetime
+from PIL import Image
 
 from db import (
     add_job,
@@ -86,6 +87,16 @@ def add_job_to_db_and_queue(params):
 # ==========================
 def clear_queue():
     delete_queued_jobs()
+
+def create_thumbnail(source_path, dest_path, size=(400, 400)):
+    try:
+        img = Image.open(source_path)
+        img.thumbnail(size)
+        img.save(dest_path, "PNG", optimize=True)
+        return True
+    except Exception as e:
+        print(f"⚠️ Failed to create thumbnail: {e}")
+        return False
 
 # ==========================
 # ✅ MAIN WORKER LOOP
