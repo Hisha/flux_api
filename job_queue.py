@@ -28,6 +28,7 @@ SD15_PYTHON = "/home/smithkt/SD1.5/SD_env/bin/python"
 FLUX_MODEL_PATH = "/home/smithkt/flux_schnell_cpu/flux_schnell_local"
 SD15_MODEL_PATH = "/home/smithkt/SD1.5"
 
+
 # ==========================
 # ✅ ADD JOB TO DB & QUEUE
 # ==========================
@@ -82,12 +83,17 @@ def add_job_to_db_and_queue(params):
         "custom_filename": requested_filename
     }
 
+
 # ==========================
 # ✅ CLEAR QUEUE
 # ==========================
 def clear_queue():
     delete_queued_jobs()
 
+
+# ==========================
+# ✅ THUMBNAIL CREATION
+# ==========================
 def create_thumbnail(source_path, dest_path, size=(400, 400)):
     try:
         img = Image.open(source_path)
@@ -97,6 +103,7 @@ def create_thumbnail(source_path, dest_path, size=(400, 400)):
     except Exception as e:
         print(f"⚠️ Failed to create thumbnail: {e}")
         return False
+
 
 # ==========================
 # ✅ MAIN WORKER LOOP
@@ -112,7 +119,7 @@ def run_worker():
         update_job_status(job_id, "in_progress", start_time=datetime.utcnow().isoformat())
 
         try:
-            # Make sure the user-defined output directory exists
+            # Ensure user-specified output directory exists
             user_output_dir = os.path.abspath(os.path.expanduser(job.get("output_dir", OUTPUT_DIR)))
             os.makedirs(user_output_dir, exist_ok=True)
         except Exception as e:
@@ -120,9 +127,7 @@ def run_worker():
                               error_message=f"Output dir error: {e}")
             continue
 
-        # ==========================
-        # ✅ Always generate in FluxImages
-        # ==========================
+        # Internal save location
         internal_save_dir = OUTPUT_DIR
         internal_filename = job["filename"]
         internal_path = os.path.join(internal_save_dir, internal_filename)
@@ -137,13 +142,13 @@ def run_worker():
                 python_bin,
                 "/home/smithkt/flux_schnell_cpu/run_flux.py",
                 "--prompt", job["prompt"],
-                "--output", internal_filename,  # Always internal filename
-                "--output_dir", internal_save_dir,  # Force save in FluxImages
+                "--output", internal_filename,
+                "--output_dir", internal_save_dir,
                 "--init_image", job["init_image"],
                 "--strength", str(job.get("strength", 0.6)),
                 "--sd_model_path", SD15_MODEL_PATH,
                 "--guidance_scale", "6.5",
-                "--steps", "40"  # Standard SD1.5 img2img
+                "--steps", "40"
             ]
         else:
             # Use Flux Schnell Txt2Img
@@ -152,8 +157,8 @@ def run_worker():
                 python_bin,
                 "/home/smithkt/flux_schnell_cpu/run_flux.py",
                 "--prompt", job["prompt"],
-                "--output", internal_filename,  # Always internal filename
-                "--output_dir", internal_save_dir,  # Force save in FluxImages
+                "--output", internal_filename,
+                "--output_dir", internal_save_dir,
                 "--flux_model_path", FLUX_MODEL_PATH,
                 "--steps", str(job.get("steps", 4)),
                 "--guidance_scale", str(job.get("guidance_scale", 3.5)),
@@ -170,30 +175,32 @@ def run_worker():
         try:
             subprocess.run(cmd, check=True)
 
-            # ✅ Copy/rename if needed
+            # ✅ Copy to user output dir if needed
             try:
-                dest_dir = user_output_dir
                 custom_filename = job.get("custom_filename")
-
                 if custom_filename:
-                    dest_path = os.path.join(dest_dir,
-                                             custom_filename if custom_filename.endswith(".png") else custom_filename + ".png")
+                    dest_path = os.path.join(user_output_dir, custom_filename)
                     shutil.copy2(internal_path, dest_path)
                     print(f"✅ Copied and renamed to: {dest_path}")
-                elif os.path.abspath(dest_dir) != os.path.abspath(internal_save_dir):
-                    dest_path = os.path.join(dest_dir, internal_filename)
+                elif os.path.abspath(user_output_dir) != os.path.abspath(internal_save_dir):
+                    dest_path = os.path.join(user_output_dir, internal_filename)
                     shutil.copy2(internal_path, dest_path)
                     print(f"✅ Copied to: {dest_path}")
             except Exception as copy_err:
                 print(f"⚠️ Failed to copy to output_dir: {copy_err}")
 
-            # ✅ Create thumbnail for gallery
-            thumb_dir = os.path.join(OUTPUT_DIR, "thumbnails")
-            os.makedirs(thumb_dir, exist_ok=True)
-            final_filename = os.path.basename(final_output_path)
-            thumb_path = os.path.join(thumb_dir, final_filename)
-            create_thumbnail(final_output_path, thumb_path)
-            print(f"✅ Thumbnail created at {thumb_path}")
+            # ✅ Create thumbnail for gallery (FluxImages/thumbnails)
+            try:
+                thumb_dir = os.path.join(OUTPUT_DIR, "thumbnails")
+                os.makedirs(thumb_dir, exist_ok=True)
+                thumb_path = os.path.join(thumb_dir, internal_filename)
+
+                if create_thumbnail(internal_path, thumb_path):
+                    print(f"✅ Thumbnail created at {thumb_path}")
+                else:
+                    print(f"⚠️ Thumbnail creation failed for {internal_path}")
+            except Exception as thumb_err:
+                print(f"⚠️ Thumbnail generation error: {thumb_err}")
 
             update_job_status(job_id, "done", end_time=datetime.utcnow().isoformat())
 
@@ -203,6 +210,7 @@ def run_worker():
         except Exception as e:
             update_job_status(job_id, "failed", end_time=datetime.utcnow().isoformat(),
                               error_message=f"Unexpected error: {e}")
+
 
 # Init DB
 init_db()
