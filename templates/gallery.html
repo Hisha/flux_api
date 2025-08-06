@@ -1,34 +1,60 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <h1 class="text-3xl font-bold mb-6">🖼️ Flux Image Gallery</h1>
+<h1 class="text-3xl font-bold mb-6">🖼️ Flux Image Gallery</h1>
 
-  {% if images|length == 0 %}
-    <p class="text-gray-400">No images found in FluxImages directory.</p>
-  {% else %}
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-      {% for image in images %}
-        <a href="{{ request.scope.root_path }}/gallery/{{ image.job_id }}" class="block bg-gray-800 rounded shadow hover:bg-gray-700">
-          <img 
-            src="{{ request.scope.root_path }}/thumbnails/{{ image.filename }}" 
-            alt="{{ image.filename }}" 
-            class="w-full h-[200px] object-cover rounded-t bg-gray-900"
-            loading="lazy">
-          <div class="p-2 text-xs text-gray-300 truncate">{{ image.filename }}</div>
-        </a>
-      {% endfor %}
-    </div>
+<div id="gallery-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
-    <!-- Pagination Controls -->
-    <div class="flex justify-between mt-6 text-white">
-      {% if has_prev %}
-        <a href="{{ request.scope.root_path }}/gallery?page={{ page - 1 }}&limit={{ limit }}" class="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">← Previous</a>
-      {% else %}
-        <span></span>
-      {% endif %}
-      {% if has_next %}
-        <a href="{{ request.scope.root_path }}/gallery?page={{ page + 1 }}&limit={{ limit }}" class="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Next →</a>
-      {% endif %}
-    </div>
-  {% endif %}
+<div id="loading" class="text-center text-gray-400 mt-4 hidden">Loading more images...</div>
+<div id="end-message" class="text-center text-gray-500 mt-4 hidden">No more images.</div>
+
+<script>
+  let page = 1;
+  const limit = 20;
+  let loading = false;
+  let hasNext = true;
+
+  async function loadImages() {
+    if (loading || !hasNext) return;
+    loading = true;
+    document.getElementById('loading').classList.remove('hidden');
+
+    const res = await fetch(`/flux/gallery/json?page=${page}&limit=${limit}`);
+    const data = await res.json();
+
+    const grid = document.getElementById('gallery-grid');
+    data.images.forEach(img => {
+      const link = document.createElement('a');
+      link.href = img.detail_url;
+      link.className = 'block bg-gray-800 rounded shadow hover:bg-gray-700';
+
+      link.innerHTML = `
+        <img src="${img.thumbnail_url}" alt="${img.filename}" 
+          class="w-full h-[200px] object-cover rounded-t bg-gray-900" loading="lazy">
+        <div class="p-2 text-xs text-gray-300 truncate">${img.filename}</div>
+      `;
+      grid.appendChild(link);
+    });
+
+    document.getElementById('loading').classList.add('hidden');
+
+    hasNext = data.has_next;
+    if (!hasNext) {
+      document.getElementById('end-message').classList.remove('hidden');
+    }
+
+    page++;
+    loading = false;
+  }
+
+  // Load initial images
+  loadImages();
+
+  // Infinite scroll
+  window.addEventListener('scroll', () => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
+      loadImages();
+    }
+  });
+</script>
 {% endblock %}
