@@ -206,16 +206,6 @@ def gallery(request: Request, page: int = Query(1, ge=1), limit: int = Query(20,
         "root_path": request.scope.get("root_path", "")
     })
 
-@app.get("/gallery/{job_id}", response_class=HTMLResponse)
-def view_gallery(request: Request, job_id: str):
-    job = get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return templates.TemplateResponse("gallery_detail.html", {
-        "request": request,
-        "job": job
-    })
-
 @app.get("/gallery/json")
 def gallery_json(
     request: Request,
@@ -258,6 +248,16 @@ def gallery_json(
         "images": images,
         "has_next": end < total
     }
+
+@app.get("/gallery/{job_id}", response_class=HTMLResponse)
+def view_gallery(request: Request, job_id: str):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return templates.TemplateResponse("gallery_detail.html", {
+        "request": request,
+        "job": job
+    })
 
 @app.get("/images/{filename}")
 def get_image(filename: str):
