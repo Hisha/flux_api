@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.responses import Response
 from starlette.middleware.sessions import SessionMiddleware
 from auth import verify_password, require_login, is_authenticated
 from db import add_job, get_job, get_job_by_filename, get_job_metrics, get_recent_jobs, delete_old_jobs, get_completed_jobs_for_archive, delete_job, get_all_jobs, get_oldest_queued_job, count_jobs_by_status
@@ -216,11 +217,27 @@ def view_gallery(request: Request, job_id: str):
     })
 
 @app.get("/gallery/json")
-def gallery_json(page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100)):
+def gallery_json(
+    request: Request,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    sort: str = Query("random", regex="^(random|newest)$")  # random or newest
+):
     image_dir = os.path.expanduser("~/FluxImages")
     files = [f for f in os.listdir(image_dir) if f.lower().endswith(".png")]
-    files.sort(reverse=True)  # newest first
 
+    if sort == "random":
+        # ✅ Assign seed if not present
+        if "gallery_seed" not in request.session:
+            request.session["gallery_seed"] = random.randint(1, 1_000_000)
+
+        seeded_random = random.Random(request.session["gallery_seed"])
+        seeded_random.shuffle(files)
+    else:
+        # ✅ Newest first (sorted by modified time)
+        files.sort(key=lambda f: os.path.getmtime(os.path.join(image_dir, f)), reverse=True)
+
+    # Pagination
     total = len(files)
     start = (page - 1) * limit
     end = start + limit
@@ -388,7 +405,11 @@ def get_thumbnail(filename: str):
     thumb_path = os.path.join(OUTPUT_DIR, "thumbnails", filename)
     if not os.path.exists(thumb_path):
         raise HTTPException(status_code=404, detail="Thumbnail not found")
-    return FileResponse(thumb_path, media_type="image/png")
+
+    headers = {
+        "Cache-Control": "public, max-age=31536000, immutable"  # 1 year cache
+    }
+    return FileResponse(thumb_path, media_type="image/png", headers=headers)
 
 #####################################################################################
 #                                   POST                                            #
