@@ -9,8 +9,10 @@
 <div id="end-message" class="text-center text-gray-500 mt-4 hidden">No more images.</div>
 
 <script>
+  const rootPath = "{{ request.scope.root_path }}";  // Jinja injects "/flux"
   let page = 1;
   const limit = 20;
+  let sort = 'random';
   let loading = false;
   let hasNext = true;
 
@@ -19,7 +21,7 @@
     loading = true;
     document.getElementById('loading').classList.remove('hidden');
 
-    const res = await fetch(`/flux/gallery/json?page=${page}&limit=${limit}`);
+    const res = await fetch(`${rootPath}/gallery/json?page=${page}&limit=${limit}&sort=${sort}`);
     const data = await res.json();
 
     const grid = document.getElementById('gallery-grid');
@@ -47,14 +49,21 @@
     loading = false;
   }
 
-  // Load initial images
-  loadImages();
+  function changeSort(newSort) {
+    sort = newSort;
+    page = 1;
+    hasNext = true;
+    document.getElementById('gallery-grid').innerHTML = '';
+    document.getElementById('end-message').classList.add('hidden');
+    loadImages();
+  }
 
-  // Infinite scroll
   window.addEventListener('scroll', () => {
     if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
       loadImages();
     }
   });
+
+  loadImages();
 </script>
 {% endblock %}
