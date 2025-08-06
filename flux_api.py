@@ -215,6 +215,33 @@ def view_gallery(request: Request, job_id: str):
         "job": job
     })
 
+@app.get("/gallery/json")
+def gallery_json(page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100)):
+    image_dir = os.path.expanduser("~/FluxImages")
+    files = [f for f in os.listdir(image_dir) if f.lower().endswith(".png")]
+    files.sort(reverse=True)  # newest first
+
+    total = len(files)
+    start = (page - 1) * limit
+    end = start + limit
+    page_files = files[start:end]
+
+    images = []
+    for fname in page_files:
+        job = get_job_by_filename(fname)
+        if job:
+            images.append({
+                "filename": fname,
+                "job_id": job["job_id"],
+                "thumbnail_url": f"/flux/thumbnails/{fname}",
+                "detail_url": f"/flux/gallery/{job['job_id']}"
+            })
+
+    return {
+        "images": images,
+        "has_next": end < total
+    }
+
 @app.get("/images/{filename}")
 def get_image(filename: str):
     image_path = os.path.join(OUTPUT_DIR, filename)
