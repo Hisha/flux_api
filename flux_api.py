@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+from pathlib import Path
 import sqlite3
 import multiprocessing
 import random
@@ -333,13 +334,21 @@ def linkable_page(request: Request):
         "files": files
     })
 
-@app.get("/linkable/download/{filename}")
+@app.get("/linkable/download/{filename:path}")
 def download_linkable_file(filename: str):
-    # Sanitize filename and enforce safe path
-    safe_path = os.path.abspath(os.path.join(LINKABLE_DIR, filename))
-    if not safe_path.startswith(os.path.abspath(LINKABLE_DIR)) or not os.path.isfile(safe_path):
+    # Allow nested files (for example armory/characters/1004.json) while
+    # ensuring the resolved path can never escape LINKABLE_DIR.
+    linkable_root = Path(LINKABLE_DIR).resolve()
+    safe_path = (linkable_root / filename).resolve()
+
+    if safe_path == linkable_root or linkable_root not in safe_path.parents or not safe_path.is_file():
         raise HTTPException(status_code=404, detail="Invalid file")
-    return FileResponse(safe_path, filename=filename, media_type="application/octet-stream")
+
+    return FileResponse(
+        str(safe_path),
+        filename=safe_path.name,
+        media_type="application/octet-stream"
+    )
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
